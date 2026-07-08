@@ -1,0 +1,12 @@
+apiVersion: agentic.openshift.io/v1alpha1
+kind: Agent
+metadata:
+  name: default
+spec:
+  llmProvider:
+    name: vertex-ai
+  model: "${VERTEX_MODEL}"
+  timeouts:
+    analysisSeconds: 120
+    executionSeconds: 120
+    verificationSeconds: 120

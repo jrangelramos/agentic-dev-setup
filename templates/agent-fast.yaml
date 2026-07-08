@@ -1,0 +1,13 @@
+apiVersion: agentic.openshift.io/v1alpha1
+kind: Agent
+metadata:
+  name: fast
+spec:
+  llmProvider:
+    name: vertex-ai
+  model: claude-haiku-4-5
+  timeouts:
+    analysisSeconds: 120
+    executionSeconds: 300
+    verificationSeconds: 120
+  maxTurns: 100

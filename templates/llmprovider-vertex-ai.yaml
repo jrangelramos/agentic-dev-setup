@@ -1,0 +1,12 @@
+apiVersion: agentic.openshift.io/v1alpha1
+kind: LLMProvider
+metadata:
+  name: vertex-ai
+spec:
+  type: GoogleCloudVertex
+  googleCloudVertex:
+    projectID: "${VERTEX_PROJECT}"
+    region: "${VERTEX_REGION}"
+    modelProvider: "${VERTEX_MODEL_PROVIDER}"
+    credentialsSecret:
+      name: llm-creds-vertex

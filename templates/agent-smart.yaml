@@ -1,0 +1,13 @@
+apiVersion: agentic.openshift.io/v1alpha1
+kind: Agent
+metadata:
+  name: smart
+spec:
+  llmProvider:
+    name: vertex-ai
+  model: claude-opus-4-6
+  timeouts:
+    analysisSeconds: 300
+    executionSeconds: 600
+    verificationSeconds: 300
+  maxTurns: 200
