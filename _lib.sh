@@ -191,7 +191,7 @@ lib::build_and_push() {
     podman build -t "${push_img}" -f "${source_dir}/${containerfile}" "${source_dir}" >&2
 
     # Ensure imagestream exists so the push target is valid.
-    oc create imagestream "${name}" -n "${AGENTIC_NAMESPACE}" 2>/dev/null || true
+    oc create imagestream "${name}" -n "${AGENTIC_NAMESPACE}" >/dev/null 2>&1 || true
 
     lib::log_info "Pushing ${push_img}..."
     podman push --tls-verify=false "${push_img}" >&2
