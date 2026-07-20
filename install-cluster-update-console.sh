@@ -91,6 +91,13 @@ if ! helm status "${PLUGIN_NAME}" -n "${AGENTIC_NAMESPACE}" >/dev/null 2>&1; the
     done
 fi
 
+echo helm upgrade --install "${PLUGIN_NAME}" "${CHART_DIR}" \
+    --namespace "${AGENTIC_NAMESPACE}" \
+    --create-namespace \
+    --set plugin.name="${PLUGIN_NAME}" \
+    --set plugin.image="${CLUSTER_UPDATE_IMAGE}" \
+    --set plugin.imagePullPolicy=Always
+
 helm upgrade --install "${PLUGIN_NAME}" "${CHART_DIR}" \
     --namespace "${AGENTIC_NAMESPACE}" \
     --create-namespace \
