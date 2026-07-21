@@ -105,5 +105,8 @@ helm upgrade --install "${PLUGIN_NAME}" "${CHART_DIR}" \
     --set plugin.image="${CLUSTER_UPDATE_IMAGE}" \
     --set plugin.imagePullPolicy=Always
 
+# Force pod rollout so new images are pulled even when the tag hasn't changed.
+oc rollout restart deployment/"${PLUGIN_NAME}" -n "${AGENTIC_NAMESPACE}"
+
 lib::wait_for_deployment "${PLUGIN_NAME}" "${AGENTIC_NAMESPACE}" "120s" || true
 lib::log_success "cluster-update-console-plugin deployed"
