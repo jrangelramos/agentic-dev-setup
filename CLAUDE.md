@@ -34,7 +34,7 @@ BUILD_ONLY=1 ./install-all.sh
 ./install-console.sh
 ./install-agentic-operator.sh
 ./install-cluster-update-console.sh
-./configure-llm.sh
+./configure-llm.sh --vertex-anthropic   # or --vertex-google, --openai
 
 # Teardown
 ./uninstall.sh
@@ -56,13 +56,12 @@ FORCE=1 ./uninstall.sh
 3. Builds sandbox, skills, console images (steps A/B/C)
 4. Deploys agentic operator via upstream quickstart `install.sh` (step D)
 5. Deploys cluster-update-console-plugin via Helm (step E)
-6. Configures LLM provider + Agent CRs (step F)
+6. Configures LLM provider + Agent CR via `configure-llm.sh` with a provider flag (step F)
 
-**`templates/`** — Kubernetes CR templates with `${ENV_VAR}` placeholders processed by `envsubst`:
-- `llmprovider-vertex-ai.yaml` — LLMProvider CR for Vertex AI
-- `agent-default.yaml` — Agent CR using `VERTEX_MODEL` (configurable)
-- `agent-fast.yaml` — Agent CR pinned to `claude-haiku-4-5`
-- `agent-smart.yaml` — Agent CR pinned to `claude-opus-4-6`
+**`templates/`** — Kubernetes CR templates with `${ENV_VAR}` placeholders processed by `envsubst`. Each provider template bundles an LLMProvider CR + Agent CR:
+- `openai.yaml` — LLMProvider + Agent for OpenAI (direct API key)
+- `vertex-anthropic.yaml` — LLMProvider + Agent for Anthropic models via Vertex AI
+- `vertex-google.yaml` — LLMProvider + Agent for Google models via Vertex AI
 - `approvalpolicy-manual.yaml` — cluster-scoped ApprovalPolicy requiring manual approval at all stages
 
 **Image build pattern**: each `install-*.sh` script outputs the in-cluster image URL on stdout so callers can capture it (e.g., `SANDBOX_IMAGE=$(./install-sandbox.sh)`). `BUILD_ONLY` mode uses `lib::build_local` (no push); normal mode uses `lib::build_and_push`.
@@ -71,10 +70,12 @@ FORCE=1 ./uninstall.sh
 
 | Variable | Required | Default |
 |---|---|---|
-| `VERTEX_PROJECT` | yes | — |
-| `VERTEX_REGION` | yes | — |
-| `VERTEX_MODEL` | no | `claude-opus-4-6` |
-| `VERTEX_MODEL_PROVIDER` | no | `Anthropic` |
+| `VERTEX_PROJECT` | for vertex providers | — |
+| `VERTEX_REGION` | for vertex providers | — |
+| `VERTEX_MODEL` | no | `gemini-2.5-flash` (vertex-google) / `claude-opus-4-6` (vertex-anthropic) |
+| `VERTEX_MODEL_PROVIDER` | no | `Google` |
+| `OPENAI_API_KEY` | for openai provider | — |
+| `OPENAI_MODEL` | no | `gpt-5.4` |
 | `AGENTIC_NAMESPACE` | no | `openshift-lightspeed` |
 | `SANDBOX_MODE` | no | `bare-pod` |
 | `SKIP_BUILD` | no | unset |
