@@ -99,7 +99,7 @@ lib::get_registry_hostname() {
 lib::ensure_registry_route() {
     lib::log_info "Patching imageregistry to expose default route..."
     oc patch configs.imageregistry.operator.openshift.io/cluster \
-        --type=merge -p '{"spec":{"defaultRoute":true}}' || {
+        --type=merge -p '{"spec":{"defaultRoute":true}}' >&2 || {
         lib::log_error "Failed to patch imageregistry (need cluster-admin)"
         exit 1
     }

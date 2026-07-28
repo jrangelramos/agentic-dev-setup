@@ -1,0 +1,27 @@
+apiVersion: agentic.openshift.io/v1alpha1
+kind: LLMProvider
+metadata:
+  name: openai
+spec:
+  type: OpenAI
+  model: "${OPENAI_MODEL}"
+  openAI:
+    credentialsSecret:
+      name: llm-creds-openai
+      namespace: "${AGENTIC_NAMESPACE}"
+---
+apiVersion: agentic.openshift.io/v1alpha1
+kind: Agent
+metadata:
+  name: default
+spec:
+  llmProvider:
+    name: openai
+  model: "${OPENAI_MODEL}"
+  reasoningConfig:
+    effort: "high"
+    summary: "auto"
+  timeouts:
+    analysisSeconds: 300
+    executionSeconds: 600
+    verificationSeconds: 300

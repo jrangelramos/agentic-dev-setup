@@ -189,8 +189,8 @@ fi
 
 # -- Configure LLM -------------------------------------------------------------
 
-lib::log_step "F" "Configuring LLM provider..."
-"${SCRIPT_DIR}/configure-llm.sh"
+lib::log_step "F" "Configuring LLM provider for claude..."
+"${SCRIPT_DIR}/configure-llm.sh --vertex-anthropic"
 
 # -- Summary -------------------------------------------------------------------
 
