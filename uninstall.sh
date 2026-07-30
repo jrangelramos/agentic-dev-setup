@@ -30,6 +30,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::subheading "Uninstall Agentic Stack"
 
 lib::require_cmd oc
 
@@ -61,7 +62,7 @@ if [[ "${FORCE:-}" != "1" ]]; then
     esac
 fi
 
-lib::log_step "1/7" "Deleting custom resources..."
+lib::step "Deleting custom resources..."
 for kind in proposals proposalapprovals analysisresults executionresults verificationresults escalationresults; do
     oc delete "${kind}" --all -n "${AGENTIC_NAMESPACE}" --ignore-not-found 2>/dev/null || true
 done
@@ -71,13 +72,13 @@ oc delete approvalpolicy cluster --ignore-not-found 2>/dev/null || true
 oc delete agenticolsconfig cluster --ignore-not-found 2>/dev/null || true
 lib::log_success "Custom resources deleted"
 
-lib::log_step "2/7" "Deleting secrets..."
+lib::step "Deleting secrets..."
 for secret in llm-creds-vertex llm-creds-openai llm-creds-azure llm-creds-bedrock; do
     oc delete secret "${secret}" -n "${AGENTIC_NAMESPACE}" --ignore-not-found 2>/dev/null || true
 done
 lib::log_success "Secrets deleted"
 
-lib::log_step "3/7" "Removing cluster-update-console-plugin..."
+lib::step "Removing cluster-update-console-plugin..."
 if helm status cluster-update-console-plugin -n "${AGENTIC_NAMESPACE}" >/dev/null 2>&1; then
     helm uninstall cluster-update-console-plugin -n "${AGENTIC_NAMESPACE}" || true
     lib::log_success "cluster-update-console-plugin removed"
@@ -85,13 +86,13 @@ else
     lib::log_info "cluster-update-console-plugin not installed — skipping"
 fi
 
-lib::log_step "4/7" "Deleting webhook resources..."
+lib::step "Deleting webhook resources..."
 oc delete mutatingwebhookconfiguration agentic-operator-mutating-webhook --ignore-not-found 2>/dev/null || true
 oc delete service agentic-operator-webhook-service -n "${AGENTIC_NAMESPACE}" --ignore-not-found 2>/dev/null || true
 oc delete secret agentic-operator-webhook-certs -n "${AGENTIC_NAMESPACE}" --ignore-not-found 2>/dev/null || true
 lib::log_success "Webhook resources deleted"
 
-lib::log_step "5/7" "Deleting operator..."
+lib::step "Deleting operator..."
 oc delete deployment lightspeed-agentic-operator -n "${AGENTIC_NAMESPACE}" --ignore-not-found 2>/dev/null || true
 oc delete sa lightspeed-agentic-operator -n "${AGENTIC_NAMESPACE}" --ignore-not-found 2>/dev/null || true
 oc delete clusterrolebinding lightspeed-agentic-operator --ignore-not-found 2>/dev/null || true
@@ -99,7 +100,7 @@ oc delete clusterrolebinding lightspeed-agent-cluster-reader --ignore-not-found 
 oc delete clusterrolebinding lightspeed-agent-monitoring-view --ignore-not-found 2>/dev/null || true
 lib::log_success "Operator removed"
 
-lib::log_step "6/7" "Deleting CRDs..."
+lib::step "Deleting CRDs..."
 for crd in \
     agenticolsconfigs.agentic.openshift.io \
     agents.agentic.openshift.io \
@@ -115,7 +116,7 @@ for crd in \
 done
 lib::log_success "CRDs deleted"
 
-lib::log_step "7/7" "Deleting namespace ${AGENTIC_NAMESPACE}..."
+lib::step "Deleting namespace ${AGENTIC_NAMESPACE}..."
 oc delete namespace "${AGENTIC_NAMESPACE}" --ignore-not-found --timeout=60s 2>/dev/null || true
 lib::log_success "Namespace deleted"
 

@@ -71,7 +71,8 @@ lib::parse_args "$@"
 
 # -- Prerequisites -------------------------------------------------------------
 
-lib::log_step "0" "Checking prerequisites..."
+lib::heading "PREREQUISITES"
+lib::step "Checking prerequisites..."
 if [[ -n "${BUILD_ONLY:-}" ]]; then
     lib::require_cmd podman
     lib::log_info "BUILD_ONLY mode — will build locally, no cluster required"
@@ -127,23 +128,21 @@ fi
 
 if [[ -z "${SKIP_BUILD:-}" ]]; then
     lib::require_cmd podman
+    lib::heading "BUILDING IMAGES"
 
     if [[ "$SANDBOX_AVAILABLE" == "true" && -z "${SANDBOX_IMAGE:-}" ]]; then
-        lib::log_step "A" "Building sandbox image..."
         SANDBOX_IMAGE=$(SANDBOX_DIR="${SANDBOX_DIR}" "${SCRIPT_DIR}/install-sandbox.sh")
         export SANDBOX_IMAGE
         lib::log_success "Sandbox image: ${SANDBOX_IMAGE}"
     fi
 
     if [[ "$SKILLS_AVAILABLE" == "true" ]]; then
-        lib::log_step "B" "Building skills image..."
         SKILLS_IMAGE=$(SKILLS_DIR="${SKILLS_DIR}" "${SCRIPT_DIR}/install-skills.sh")
         export SKILLS_IMAGE
         lib::log_success "Skills image: ${SKILLS_IMAGE}"
     fi
 
     if [[ "$CONSOLE_AVAILABLE" == "true" && -z "${CONSOLE_IMAGE:-}" ]]; then
-        lib::log_step "C" "Building console plugin image..."
         CONSOLE_IMAGE=$(CONSOLE_DIR="${CONSOLE_DIR}" "${SCRIPT_DIR}/install-console.sh")
         export CONSOLE_IMAGE
         lib::log_success "Console image: ${CONSOLE_IMAGE}"
@@ -174,7 +173,7 @@ fi
 
 # -- Deploy agentic operator ---------------------------------------------------
 
-lib::log_step "D" "Deploying agentic operator..."
+lib::heading "DEPLOYING COMPONENTS"
 AGENTIC_OPERATOR_DIR="${AGENTIC_OPERATOR_DIR}" \
     SANDBOX_IMAGE="${SANDBOX_IMAGE:-}" \
     CONSOLE_IMAGE="${CONSOLE_IMAGE:-}" \
@@ -183,14 +182,13 @@ AGENTIC_OPERATOR_DIR="${AGENTIC_OPERATOR_DIR}" \
 # -- Deploy cluster-update-console-plugin (standalone, not managed by operator) -
 
 if [[ "$CLUSTER_UPDATE_AVAILABLE" == "true" ]]; then
-    lib::log_step "E" "Deploying cluster-update-console-plugin..."
     CLUSTER_UPDATE_DIR="${CLUSTER_UPDATE_DIR}" "${SCRIPT_DIR}/install-cluster-update-console.sh"
 fi
 
 # -- Configure LLM -------------------------------------------------------------
 
-lib::log_step "F" "Configuring LLM provider for claude..."
-"${SCRIPT_DIR}/configure-llm.sh --vertex-anthropic"
+lib::heading "CONFIGURING LLM"
+"${SCRIPT_DIR}/configure-llm.sh" --vertex-anthropic
 
 # -- Summary -------------------------------------------------------------------
 
@@ -223,6 +221,11 @@ cat <<DONE
     oc patch proposalapproval <name> -n ${AGENTIC_NAMESPACE} \\
       --type=json \\
       -p '[{"op":"add","path":"/spec/stages/-","value":{"type":"Execution","execution":{"option":0}}}]'
+
+  Deploy dev CVO (optional, requires cluster-version-operator repo):
+
+    ${SCRIPT_DIR}/install-cvo.sh
+    ${SCRIPT_DIR}/install-cvo.sh --skip-tp-check
 
   Uninstall:
 

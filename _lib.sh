@@ -30,7 +30,10 @@ lib::parse_args() {
     esac
 }
 
-lib::log_step()    { echo -e "\n${_BOLD}[${1}]${_RESET} ${2}" >&2; }
+_LIB_STEP=0
+lib::heading()     { _LIB_STEP=0; echo -e "\n${_BOLD}${_YELLOW}── $* ──${_RESET}" >&2; }
+lib::subheading()  { _LIB_STEP=0; echo -e "\n ${_BOLD}▸ $*${_RESET}" >&2; }
+lib::step()        { _LIB_STEP=$((_LIB_STEP + 1)); echo -e "\n${_BOLD}${_CYAN} => ${_LIB_STEP}. $*${_RESET}" >&2; }
 lib::log_info()    { echo -e "  ${_CYAN}ℹ${_RESET} $*" >&2; }
 lib::log_success() { echo -e "  ${_GREEN}✓${_RESET} $*" >&2; }
 lib::log_warning() { echo -e "  ${_YELLOW}⚠${_RESET} $*" >&2; }
@@ -58,6 +61,21 @@ lib::require_oc_login() {
     lib::require_cmd oc
     if ! oc whoami >/dev/null 2>&1; then
         lib::log_error "Not logged into a cluster. Run: oc login ..."
+        exit 1
+    fi
+    if ! oc whoami -t >/dev/null 2>&1; then
+        local server
+        server=$(oc whoami --show-server 2>/dev/null || echo "<api-server-url>")
+        lib::log_error "No OAuth token for the current session."
+        lib::log_error "A token-based login is required for registry operations."
+        echo "" >&2
+        lib::log_info "Option A: Log in with kubeadmin (prompts for password):"
+        echo "    oc login -u kubeadmin ${server}" >&2
+        echo "" >&2
+        lib::log_info "Option B: Copy the login command from the OCP web console:"
+        echo "    1. Open the OpenShift web console" >&2
+        echo "    2. Click your username (top right) → 'Copy login command'" >&2
+        echo "    3. Click 'Display Token' and run the oc login command shown" >&2
         exit 1
     fi
     if ! oc auth can-i create clusterrolebindings >/dev/null 2>&1; then
@@ -219,10 +237,12 @@ lib::wait_for_deployment() {
 
 lib::ensure_pull_secret() {
     local ns="${1:-${AGENTIC_NAMESPACE}}" sa="${2:-default}"
+    local token
+    token=$(oc create token builder -n "${ns}")
     oc -n "${ns}" create secret docker-registry internal-registry-pull \
         --docker-server="${_REGISTRY}" \
-        --docker-username="$(oc whoami)" \
-        --docker-password="$(oc whoami -t)" \
+        --docker-username="builder" \
+        --docker-password="${token}" \
         --dry-run=client -o yaml | oc apply -f - >&2
     oc -n "${ns}" secrets link "serviceaccount/${sa}" internal-registry-pull --for=pull 2>/dev/null || true
 }

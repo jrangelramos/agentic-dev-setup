@@ -97,6 +97,7 @@ fi
 
 lib::require_cmd oc
 lib::require_cmd envsubst
+lib::subheading "LLM Provider (${PROVIDER})"
 
 # -- Provider-specific setup --------------------------------------------------
 
@@ -106,14 +107,14 @@ case "${PROVIDER}" in
         export OPENAI_MODEL="${OPENAI_MODEL:-gpt-5.4}"
         export AGENTIC_NAMESPACE
 
-        lib::log_step "1/2" "Creating OpenAI credentials secret..."
+        lib::step "Creating OpenAI credentials secret..."
         oc create secret generic llm-creds-openai \
             -n "${AGENTIC_NAMESPACE}" \
             --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
             --dry-run=client -o yaml | oc apply -f -
         lib::log_success "Secret llm-creds-openai created"
 
-        lib::log_step "2/2" "Applying LLMProvider + Agent CR (OpenAI)..."
+        lib::step "Applying LLMProvider + Agent CR (OpenAI)..."
         envsubst < "${SCRIPT_DIR}/templates/openai.yaml" | oc apply -f -
         lib::log_success "LLMProvider 'openai' and Agent applied"
         ;;
@@ -127,14 +128,14 @@ case "${PROVIDER}" in
         export VERTEX_REGION
         export VERTEX_MODEL="${VERTEX_MODEL:-claude-opus-4-6}"
 
-        lib::log_step "1/2" "Creating Vertex AI credentials secret..."
+        lib::step "Creating Vertex AI credentials secret..."
         oc create secret generic llm-creds-vertex \
             -n "${AGENTIC_NAMESPACE}" \
             --from-file=GOOGLE_APPLICATION_CREDENTIALS="${CREDS_PATH}" \
             --dry-run=client -o yaml | oc apply -f -
         lib::log_success "Secret llm-creds-vertex created"
 
-        lib::log_step "2/2" "Applying LLMProvider + Agent CR (Vertex/Anthropic)..."
+        lib::step "Applying LLMProvider + Agent CR (Vertex/Anthropic)..."
         envsubst < "${SCRIPT_DIR}/templates/vertex-anthropic.yaml" | oc apply -f -
         lib::log_success "LLMProvider 'vertex-anthropic' and Agent applied"
         ;;
@@ -148,14 +149,14 @@ case "${PROVIDER}" in
         export VERTEX_REGION
         export VERTEX_MODEL="${VERTEX_MODEL:-gemini-2.5-flash}"
 
-        lib::log_step "1/2" "Creating Vertex AI credentials secret..."
+        lib::step "Creating Vertex AI credentials secret..."
         oc create secret generic llm-creds-vertex \
             -n "${AGENTIC_NAMESPACE}" \
             --from-file=GOOGLE_APPLICATION_CREDENTIALS="${CREDS_PATH}" \
             --dry-run=client -o yaml | oc apply -f -
         lib::log_success "Secret llm-creds-vertex created"
 
-        lib::log_step "2/2" "Applying LLMProvider + Agent CR (Vertex/Google)..."
+        lib::step "Applying LLMProvider + Agent CR (Vertex/Google)..."
         envsubst < "${SCRIPT_DIR}/templates/vertex-google.yaml" | oc apply -f -
         lib::log_success "LLMProvider 'vertex-google' and Agent applied"
         ;;

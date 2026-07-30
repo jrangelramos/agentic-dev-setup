@@ -13,7 +13,7 @@ Shell scripts to install the full Lightspeed agentic stack on an OpenShift clust
 - GCP credentials available (service account key, `GOOGLE_APPLICATION_CREDENTIALS`, or `gcloud auth application-default login`)
 - Required sibling repos cloned alongside this repo (use `clone.sh` from lightspeed-operator):
   - `lightspeed-agentic-operator` (required)
-  - `lightspeed-agentic-sandbox`, `agentic-skills`, `lightspeed-agentic-console`, `cluster-update-console-plugin` (optional)
+  - `lightspeed-agentic-sandbox`, `agentic-skills`, `lightspeed-agentic-console`, `cluster-update-console-plugin`, `cluster-version-operator` (optional)
 
 ## Common Commands
 
@@ -35,6 +35,10 @@ BUILD_ONLY=1 ./install-all.sh
 ./install-agentic-operator.sh
 ./install-cluster-update-console.sh
 ./configure-llm.sh --vertex-anthropic   # or --vertex-google, --openai
+
+# Dev CVO with agenticrun controller (optional, standalone)
+./install-cvo.sh
+./install-cvo.sh --skip-tp-check
 
 # Teardown
 ./uninstall.sh
@@ -63,6 +67,8 @@ FORCE=1 ./uninstall.sh
 - `vertex-anthropic.yaml` — LLMProvider + Agent for Anthropic models via Vertex AI
 - `vertex-google.yaml` — LLMProvider + Agent for Google models via Vertex AI
 - `approvalpolicy-manual.yaml` — cluster-scoped ApprovalPolicy requiring manual approval at all stages
+
+**`install-cvo.sh`** — standalone script (not called by `install-all.sh`). Builds a dev CVO from the `cluster-version-operator` sibling repo with the agenticrun controller enabled. Generates a `Dockerfile.dev` with embedded release metadata and agentic-skills image reference, pushes to the `cvo-dev` project, and patches the live CVO deployment. Supports `--skip-tp-check` to bypass the TechPreviewNoUpgrade gate.
 
 **Image build pattern**: each `install-*.sh` script outputs the in-cluster image URL on stdout so callers can capture it (e.g., `SANDBOX_IMAGE=$(./install-sandbox.sh)`). `BUILD_ONLY` mode uses `lib::build_local` (no push); normal mode uses `lib::build_and_push`.
 

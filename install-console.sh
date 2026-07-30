@@ -30,6 +30,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::subheading "Console Plugin"
 
 CONSOLE_DIR=$(lib::resolve_sibling CONSOLE_DIR lightspeed-agentic-console) || {
     lib::log_error "Console source not found. Set CONSOLE_DIR or clone lightspeed-agentic-console next to this repo."

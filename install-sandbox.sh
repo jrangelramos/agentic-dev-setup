@@ -30,6 +30,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::subheading "Sandbox"
 
 SANDBOX_DIR=$(lib::resolve_sibling SANDBOX_DIR lightspeed-agentic-sandbox) || {
     lib::log_error "Sandbox source not found. Set SANDBOX_DIR or clone lightspeed-agentic-sandbox next to this repo."

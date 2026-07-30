@@ -41,6 +41,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::subheading "Agentic Operator"
 
 AGENTIC_OPERATOR_DIR=$(lib::resolve_sibling AGENTIC_OPERATOR_DIR lightspeed-agentic-operator) || {
     lib::log_error "Agentic operator source not found. Set AGENTIC_OPERATOR_DIR or clone lightspeed-agentic-operator next to this repo."
@@ -59,7 +60,7 @@ IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-Always}"
 # -- Build operator image (unless SKIP_BUILD) ----------------------------------
 
 if [[ -z "${SKIP_BUILD:-}" ]]; then
-    lib::log_step "1/3" "Building agentic operator from source..."
+    lib::step "Building agentic operator from source..."
     if [[ -n "${BUILD_ONLY:-}" ]]; then
         OPERATOR_IMAGE=$(lib::build_local "lightspeed-agentic-operator" "${AGENTIC_OPERATOR_DIR}" "Dockerfile")
     else
@@ -71,7 +72,7 @@ if [[ -z "${SKIP_BUILD:-}" ]]; then
     fi
     lib::log_success "Operator image: ${OPERATOR_IMAGE}"
 else
-    lib::log_step "1/3" "Skipping build (SKIP_BUILD set)"
+    lib::step "Skipping build (SKIP_BUILD set)"
 fi
 
 if [[ -n "${BUILD_ONLY:-}" ]]; then
@@ -81,7 +82,7 @@ fi
 
 # -- Deploy via upstream quickstart --------------------------------------------
 
-lib::log_step "2/3" "Deploying via quickstart install.sh..."
+lib::step "Deploying via quickstart install.sh..."
 
 NAMESPACE="${AGENTIC_NAMESPACE}" \
     OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
@@ -93,7 +94,7 @@ NAMESPACE="${AGENTIC_NAMESPACE}" \
 
 # -- Apply ApprovalPolicy (cluster-scoped singleton) --------------------------
 
-lib::log_step "3/3" "Applying ApprovalPolicy..."
+lib::step "Applying ApprovalPolicy..."
 
 oc apply -f "${SCRIPT_DIR}/templates/approvalpolicy-manual.yaml"
 

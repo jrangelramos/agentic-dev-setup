@@ -38,6 +38,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::subheading "Skills"
 
 SKILLS_DIR=$(lib::resolve_sibling SKILLS_DIR agentic-skills) || {
     lib::log_error "Skills source not found. Set SKILLS_DIR or clone agentic-skills next to this repo."

@@ -33,6 +33,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::subheading "Cluster Update Console Plugin"
 
 CLUSTER_UPDATE_DIR=$(lib::resolve_sibling CLUSTER_UPDATE_DIR cluster-update-console-plugin) || {
     lib::log_error "cluster-update-console-plugin source not found. Set CLUSTER_UPDATE_DIR or clone it next to this repo."
@@ -53,7 +54,7 @@ fi
 # -- Build image ---------------------------------------------------------------
 
 if [[ -z "${SKIP_BUILD:-}" && -z "${CLUSTER_UPDATE_IMAGE:-}" ]]; then
-    lib::log_step "1/2" "Building cluster-update-console-plugin..."
+    lib::step "Building cluster-update-console-plugin..."
     if [[ -n "${BUILD_ONLY:-}" ]]; then
         CLUSTER_UPDATE_IMAGE=$(lib::build_local "${PLUGIN_NAME}" "${CLUSTER_UPDATE_DIR}" "Dockerfile")
     else
@@ -61,7 +62,7 @@ if [[ -z "${SKIP_BUILD:-}" && -z "${CLUSTER_UPDATE_IMAGE:-}" ]]; then
         CLUSTER_UPDATE_IMAGE=$(lib::build_and_push "${PLUGIN_NAME}" "${CLUSTER_UPDATE_DIR}" "Dockerfile")
     fi
 else
-    lib::log_step "1/2" "Skipping build"
+    lib::step "Skipping build"
     CLUSTER_UPDATE_IMAGE="${CLUSTER_UPDATE_IMAGE:-quay.io/openshift/${PLUGIN_NAME}:latest}"
 fi
 
@@ -74,7 +75,7 @@ fi
 
 # -- Deploy via Helm -----------------------------------------------------------
 
-lib::log_step "2/2" "Deploying via Helm chart..."
+lib::step "Deploying via Helm chart..."
 
 # Clean up orphaned resources from a previous partial install.
 # Deployment selectors are immutable so it must be deleted for Helm to recreate it.
