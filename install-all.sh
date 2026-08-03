@@ -84,6 +84,16 @@ else
     lib::require_oc_login
     lib::require_var VERTEX_PROJECT
     lib::require_var VERTEX_REGION
+
+    # Verify GCP credentials are available before starting long builds
+    adc_default="${HOME}/.config/gcloud/application_default_credentials.json"
+    if [[ -z "${VERTEX_SA_KEY_PATH:-}" && -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" && ! -f "${adc_default}" ]]; then
+        lib::log_error "No GCP credentials found. Either:"
+        lib::log_error "  - Set VERTEX_SA_KEY_PATH to a service account key JSON"
+        lib::log_error "  - Set GOOGLE_APPLICATION_CREDENTIALS"
+        lib::log_error "  - Run: gcloud auth application-default login"
+        exit 1
+    fi
 fi
 
 # -- Resolve sibling repos ----------------------------------------------------
