@@ -1,0 +1,26 @@
+apiVersion: ols.openshift.io/v1alpha1
+kind: OLSConfig
+metadata:
+  name: cluster
+spec:
+  llm:
+    providers:
+      - name: openai
+        type: openai
+        url: https://api.openai.com/v1
+        credentialsSecretRef:
+          name: ols-llm-creds-openai
+        models:
+          - name: "${OLS_MODEL}"
+  ols:
+    defaultProvider: openai
+    defaultModel: "${OLS_MODEL}"
+    logLevel: INFO
+    conversationCache:
+      type: postgres
+      postgres:
+        sharedBuffers: 256MB
+        maxConnections: 2000
+    byokRAGOnly: true
+    deployment:
+      replicas: 1

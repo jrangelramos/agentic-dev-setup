@@ -13,7 +13,7 @@ Shell scripts to install the full Lightspeed agentic stack on an OpenShift clust
 - GCP credentials available (service account key, `GOOGLE_APPLICATION_CREDENTIALS`, or `gcloud auth application-default login`)
 - Required sibling repos cloned alongside this repo (use `clone.sh` from lightspeed-operator):
   - `lightspeed-agentic-operator` (required)
-  - `lightspeed-agentic-sandbox`, `agentic-skills`, `lightspeed-agentic-console`, `cluster-update-console-plugin`, `cluster-version-operator` (optional)
+  - `lightspeed-operator`, `lightspeed-agentic-sandbox`, `agentic-skills`, `lightspeed-agentic-console`, `cluster-update-console-plugin`, `cluster-version-operator` (optional)
 
 ## Common Commands
 
@@ -32,9 +32,11 @@ BUILD_ONLY=1 ./install-all.sh
 ./install-sandbox.sh
 ./install-skills.sh
 ./install-console.sh
+./install-lightspeed.sh
 ./install-agentic-operator.sh
 ./install-cluster-update-console.sh
 ./configure-llm.sh --vertex-anthropic   # or --vertex-google, --openai
+./ols-configure-llm.sh --vertex-anthropic  # or --vertex-google, --openai
 
 # Dev CVO with agenticrun controller (optional, standalone)
 ./install-cvo.sh
@@ -57,16 +59,22 @@ FORCE=1 ./uninstall.sh
 **`install-all.sh`** — orchestrator. Runs in order:
 1. Prerequisite checks
 2. Resolves sibling repo paths
-3. Builds sandbox, skills, console images (steps A/B/C)
-4. Deploys agentic operator via upstream quickstart `install.sh` (step D)
-5. Deploys cluster-update-console-plugin via Helm (step E)
-6. Configures LLM provider + Agent CR via `configure-llm.sh` with a provider flag (step F)
+3. Builds sandbox, skills, console images
+4. Deploys lightspeed operator via `install-lightspeed.sh` (kustomize-based `make deploy`) + OLSConfig
+5. Deploys agentic operator via upstream quickstart `install.sh`
+6. Deploys cluster-update-console-plugin via Helm
+7. Configures LLM provider + Agent CR via `configure-llm.sh` with a provider flag
 
-**`templates/`** — Kubernetes CR templates with `${ENV_VAR}` placeholders processed by `envsubst`. Each provider template bundles an LLMProvider CR + Agent CR:
+**`templates/`** — Kubernetes CR templates with `${ENV_VAR}` placeholders processed by `envsubst`:
 - `openai.yaml` — LLMProvider + Agent for OpenAI (direct API key)
 - `vertex-anthropic.yaml` — LLMProvider + Agent for Anthropic models via Vertex AI
 - `vertex-google.yaml` — LLMProvider + Agent for Google models via Vertex AI
 - `approvalpolicy-manual.yaml` — cluster-scoped ApprovalPolicy requiring manual approval at all stages
+- `ols-openai.yaml` — OLSConfig for OpenAI
+- `ols-vertex-google.yaml` — OLSConfig for Google models via Vertex AI
+- `ols-vertex-anthropic.yaml` — OLSConfig for Anthropic models via Vertex AI
+
+**`install-lightspeed.sh`** — builds the lightspeed-operator from `../lightspeed-operator`, pushes to internal registry, deploys via `make deploy IMG=<image>` (kustomize-based), and calls `ols-configure-llm.sh` to create the OLSConfig CR + LLM secret.
 
 **`install-cvo.sh`** — standalone script (not called by `install-all.sh`). Builds a dev CVO from the `cluster-version-operator` sibling repo with the agenticrun controller enabled. Generates a `Dockerfile.dev` with embedded release metadata and agentic-skills image reference, pushes to the `cvo-dev` project, and patches the live CVO deployment. Supports `--skip-tp-check` to bypass the TechPreviewNoUpgrade gate.
 
@@ -82,6 +90,7 @@ FORCE=1 ./uninstall.sh
 | `VERTEX_MODEL_PROVIDER` | no | `Google` |
 | `OPENAI_API_KEY` | for openai provider | — |
 | `OPENAI_MODEL` | no | `gpt-5.4` |
+| `OLS_MODEL` | no | `gpt-5.4` (openai) / `gemini-2.5-flash` (vertex-google) / `claude-opus-4-6` (vertex-anthropic) |
 | `AGENTIC_NAMESPACE` | no | `openshift-lightspeed` |
 | `SANDBOX_MODE` | no | `bare-pod` |
 | `SKIP_BUILD` | no | unset |

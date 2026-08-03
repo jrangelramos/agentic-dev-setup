@@ -1,0 +1,28 @@
+apiVersion: ols.openshift.io/v1alpha1
+kind: OLSConfig
+metadata:
+  name: cluster
+spec:
+  llm:
+    providers:
+      - name: google_vertex
+        type: google_vertex
+        credentialsSecretRef:
+          name: ols-llm-creds-vertex
+        googleVertexConfig:
+          projectID: "${VERTEX_PROJECT}"
+          location: "${VERTEX_REGION}"
+        models:
+          - name: "${OLS_MODEL}"
+  ols:
+    defaultProvider: google_vertex
+    defaultModel: "${OLS_MODEL}"
+    logLevel: INFO
+    conversationCache:
+      type: postgres
+      postgres:
+        sharedBuffers: 256MB
+        maxConnections: 2000
+    byokRAGOnly: true
+    deployment:
+      replicas: 1

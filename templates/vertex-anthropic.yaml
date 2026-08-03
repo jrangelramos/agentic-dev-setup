@@ -23,3 +23,29 @@ spec:
     analysisSeconds: 300
     executionSeconds: 600
     verificationSeconds: 300
+---
+apiVersion: agentic.openshift.io/v1alpha1
+kind: Agent
+metadata:
+  name: smart
+spec:
+  llmProvider:
+    name: vertex-anthropic
+  model: "${VERTEX_MODEL}"
+  timeouts:
+    analysisSeconds: 300
+    executionSeconds: 600
+    verificationSeconds: 300
+---
+apiVersion: agentic.openshift.io/v1alpha1
+kind: Agent
+metadata:
+  name: fast
+spec:
+  llmProvider:
+    name: vertex-anthropic
+  model: "${VERTEX_MODEL}"
+  timeouts:
+    analysisSeconds: 300
+    executionSeconds: 600
+    verificationSeconds: 300

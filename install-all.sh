@@ -21,6 +21,7 @@
 #   SANDBOX_IMAGE         Override sandbox image (skip build)
 #   CONSOLE_IMAGE         Override console image
 #   SKIP_BUILD            If set, skip all image builds
+#   LIGHTSPEED_DIR        Path to lightspeed-operator source
 #   AGENTIC_OPERATOR_DIR  Path to lightspeed-agentic-operator source
 #   SANDBOX_DIR           Path to lightspeed-agentic-sandbox source
 #   SKILLS_DIR            Path to agentic-skills source
@@ -60,6 +61,7 @@ Environment variables:
   CLUSTER_UPDATE_IMAGE               Override cluster-update-console image
   SKIP_BUILD                         Skip all image builds (use pre-built Konflux images)
   BUILD_ONLY                         Build images locally only (no push, no deploy, no cluster needed)
+  LIGHTSPEED_DIR                     Path to lightspeed-operator (default: ../lightspeed-operator)
   AGENTIC_OPERATOR_DIR               Path to lightspeed-agentic-operator (default: ../lightspeed-agentic-operator)
   SANDBOX_DIR                        Path to lightspeed-agentic-sandbox (default: ../lightspeed-agentic-sandbox)
   SKILLS_DIR                         Path to agentic-skills (default: ../agentic-skills)
@@ -85,6 +87,14 @@ else
 fi
 
 # -- Resolve sibling repos ----------------------------------------------------
+
+LIGHTSPEED_AVAILABLE=false
+if LIGHTSPEED_DIR=$(lib::resolve_sibling LIGHTSPEED_DIR lightspeed-operator); then
+    LIGHTSPEED_AVAILABLE=true
+    lib::log_success "Lightspeed operator: ${LIGHTSPEED_DIR}"
+else
+    lib::log_warning "lightspeed-operator not found — skipping"
+fi
 
 AGENTIC_OPERATOR_DIR=$(lib::resolve_sibling AGENTIC_OPERATOR_DIR lightspeed-agentic-operator) || {
     lib::log_error "lightspeed-agentic-operator not found. Clone it next to this repo or set AGENTIC_OPERATOR_DIR."
@@ -171,9 +181,18 @@ DONE
     exit 0
 fi
 
-# -- Deploy agentic operator ---------------------------------------------------
+# -- Deploy lightspeed operator ------------------------------------------------
 
 lib::heading "DEPLOYING COMPONENTS"
+
+if [[ "$LIGHTSPEED_AVAILABLE" == "true" ]]; then
+    LIGHTSPEED_DIR="${LIGHTSPEED_DIR}" \
+        LLM_PROVIDER="--vertex-anthropic" \
+        "${SCRIPT_DIR}/install-lightspeed.sh"
+fi
+
+# -- Deploy agentic operator ---------------------------------------------------
+
 AGENTIC_OPERATOR_DIR="${AGENTIC_OPERATOR_DIR}" \
     SANDBOX_IMAGE="${SANDBOX_IMAGE:-}" \
     CONSOLE_IMAGE="${CONSOLE_IMAGE:-}" \

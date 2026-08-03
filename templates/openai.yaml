@@ -25,3 +25,35 @@ spec:
     analysisSeconds: 300
     executionSeconds: 600
     verificationSeconds: 300
+---
+apiVersion: agentic.openshift.io/v1alpha1
+kind: Agent
+metadata:
+  name: smart
+spec:
+  llmProvider:
+    name: openai
+  model: "${OPENAI_MODEL}"
+  reasoningConfig:
+    effort: "high"
+    summary: "auto"
+  timeouts:
+    analysisSeconds: 300
+    executionSeconds: 600
+    verificationSeconds: 300
+---
+apiVersion: agentic.openshift.io/v1alpha1
+kind: Agent
+metadata:
+  name: fast
+spec:
+  llmProvider:
+    name: openai
+  model: "${OPENAI_MODEL}"
+  reasoningConfig:
+    effort: "high"
+    summary: "auto"
+  timeouts:
+    analysisSeconds: 300
+    executionSeconds: 600
+    verificationSeconds: 300
