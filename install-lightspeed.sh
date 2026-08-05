@@ -95,4 +95,17 @@ LLM_PROVIDER="${LLM_PROVIDER:---vertex-anthropic}"
 lib::step "Configuring OLS LLM provider..."
 "${SCRIPT_DIR}/ols-configure-llm.sh" "${LLM_PROVIDER}"
 
+# -- Patch sandbox image (if custom-built) ------------------------------------
+
+if [[ -n "${SANDBOX_IMAGE:-}" ]]; then
+    lib::step "Patching controller-manager with custom sandbox image..."
+    oc patch deployment lightspeed-operator-controller-manager \
+        -n "${AGENTIC_NAMESPACE}" --type=json -p "[
+        {\"op\":\"add\",\"path\":\"/spec/template/spec/containers/0/args/-\",
+         \"value\":\"--agentic-sandbox-image=${SANDBOX_IMAGE}\"}
+      ]"
+    lib::wait_for_deployment "lightspeed-operator-controller-manager"
+    lib::log_success "Controller-manager patched with sandbox image: ${SANDBOX_IMAGE}"
+fi
+
 lib::log_success "Lightspeed operator deployed and configured"

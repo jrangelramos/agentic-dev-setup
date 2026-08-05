@@ -21,6 +21,7 @@ _RED='\033[0;31m'
 _GREEN='\033[0;32m'
 _YELLOW='\033[1;33m'
 _CYAN='\033[0;36m'
+_MAGENTA='\033[0;35m'
 _BOLD='\033[1m'
 _RESET='\033[0m'
 
@@ -32,7 +33,7 @@ lib::parse_args() {
 
 _LIB_STEP=0
 lib::heading()     { _LIB_STEP=0; echo -e "\n${_BOLD}${_YELLOW}── $* ──${_RESET}" >&2; }
-lib::subheading()  { _LIB_STEP=0; echo -e "\n ${_BOLD}▸ $*${_RESET}" >&2; }
+lib::subheading()  { _LIB_STEP=0; echo -e "\n ${_BOLD}${_MAGENTA}▸ $*${_RESET}" >&2; }
 lib::step()        { _LIB_STEP=$((_LIB_STEP + 1)); echo -e "\n${_BOLD}${_CYAN} => ${_LIB_STEP}. $*${_RESET}" >&2; }
 lib::log_info()    { echo -e "  ${_CYAN}ℹ${_RESET} $*" >&2; }
 lib::log_success() { echo -e "  ${_GREEN}✓${_RESET} $*" >&2; }

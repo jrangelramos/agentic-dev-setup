@@ -84,13 +84,13 @@ fi
 
 lib::step "Deploying via quickstart install.sh..."
 
+QUICKSTART_ARGS=()
+[[ -n "${OPERATOR_IMAGE}" ]]     && QUICKSTART_ARGS+=("--operator-image=${OPERATOR_IMAGE}")
+[[ -n "${SANDBOX_IMAGE:-}" ]]    && QUICKSTART_ARGS+=("--sandbox-image=${SANDBOX_IMAGE}")
+[[ -n "${CONSOLE_IMAGE:-}" ]]    && QUICKSTART_ARGS+=("--console-image=${CONSOLE_IMAGE}")
+
 NAMESPACE="${AGENTIC_NAMESPACE}" \
-    OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
-    SANDBOX_IMAGE="${SANDBOX_IMAGE:-}" \
-    CONSOLE_IMAGE="${CONSOLE_IMAGE:-}" \
-    SANDBOX_MODE="${SANDBOX_MODE}" \
-    IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY}" \
-    bash "${QUICKSTART}"
+    bash "${QUICKSTART}" "${QUICKSTART_ARGS[@]+"${QUICKSTART_ARGS[@]}"}"
 
 # -- Apply ApprovalPolicy (cluster-scoped singleton) --------------------------
 
