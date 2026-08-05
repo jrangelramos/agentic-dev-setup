@@ -14,10 +14,6 @@
 #   --release-image arg.  CVO reconciles from itself, skipping manifests whose
 #   images aren't in the references.
 #
-# Note on console-plugin exclusion:
-#   The 0000_50_* console-plugin manifests are removed from the dev image.
-#   The console-plugin is managed by the Lightspeed operator, not by CVO.
-#   Including them causes CVO to deploy a duplicate that fails SCC validation.
 #
 # WARNING: NEVER RUN THIS AGAINST A PRODUCTION CLUSTER.
 
