@@ -27,3 +27,4 @@ clone openshift lightspeed-agentic-operator
 clone openshift lightspeed-agentic-sandbox
 clone openshift lightspeed-operator
 clone openshift cluster-update-console-plugin
+clone openshift cluster-version-operator
