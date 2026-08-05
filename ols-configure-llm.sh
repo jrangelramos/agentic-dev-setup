@@ -89,6 +89,7 @@ case "${1:-}" in
         exit 1
         ;;
 esac
+lib::dev_disclaimer
 
 if [[ -n "${BUILD_ONLY:-}" ]]; then
     lib::log_info "BUILD_ONLY set — skipping OLS LLM configuration"

@@ -70,6 +70,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::dev_disclaimer
 
 # -- Prerequisites -------------------------------------------------------------
 

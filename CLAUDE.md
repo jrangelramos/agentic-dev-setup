@@ -11,7 +11,7 @@ Shell scripts to install the full Lightspeed agentic stack on an OpenShift clust
 - `oc`, `podman`, `envsubst`, `helm` on PATH
 - Logged into an OpenShift cluster with cluster-admin
 - GCP credentials available (service account key, `GOOGLE_APPLICATION_CREDENTIALS`, or `gcloud auth application-default login`)
-- Required sibling repos cloned alongside this repo (use `clone.sh` from lightspeed-operator):
+- Required sibling repos cloned alongside this repo (use `clone.sh`):
   - `lightspeed-agentic-operator` (required)
   - `lightspeed-operator`, `lightspeed-agentic-sandbox`, `agentic-skills`, `lightspeed-agentic-console`, `cluster-update-console-plugin`, `cluster-version-operator` (optional)
 
@@ -57,7 +57,7 @@ FORCE=1 ./uninstall.sh
 - `lib::wait_for_deployment`, `lib::ensure_namespace`, `lib::ensure_pull_secret` — cluster helpers
 
 **`install-all.sh`** — orchestrator. Runs in order:
-1. Prerequisite checks
+1. Prerequisite checks (including early GCP credential validation before builds)
 2. Resolves sibling repo paths
 3. Builds sandbox, skills, console images
 4. Deploys lightspeed operator via `install-lightspeed.sh` (kustomize-based `make deploy`) + OLSConfig
@@ -74,7 +74,7 @@ FORCE=1 ./uninstall.sh
 - `ols-vertex-google.yaml` — OLSConfig for Google models via Vertex AI
 - `ols-vertex-anthropic.yaml` — OLSConfig for Anthropic models via Vertex AI
 
-**`install-lightspeed.sh`** — builds the lightspeed-operator from `../lightspeed-operator`, pushes to internal registry, deploys via `make deploy IMG=<image>` (kustomize-based), and calls `ols-configure-llm.sh` to create the OLSConfig CR + LLM secret.
+**`install-lightspeed.sh`** — builds the lightspeed-operator from `../lightspeed-operator`, pushes to internal registry, deploys via `make deploy IMG=<image>` (kustomize-based), and calls `ols-configure-llm.sh` to create the OLSConfig CR + LLM secret. If `SANDBOX_IMAGE` is set, patches the controller-manager deployment to use the custom sandbox image.
 
 **`install-cvo.sh`** — standalone script (not called by `install-all.sh`). Builds a dev CVO from the `cluster-version-operator` sibling repo with the agenticrun controller enabled. Generates a `Dockerfile.dev` with embedded release metadata and agentic-skills image reference, pushes to the `cvo-dev` project, and patches the live CVO deployment. Supports `--skip-tp-check` to bypass the TechPreviewNoUpgrade gate.
 

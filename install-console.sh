@@ -30,6 +30,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::dev_disclaimer
 lib::subheading "Console Plugin"
 
 CONSOLE_DIR=$(lib::resolve_sibling CONSOLE_DIR lightspeed-agentic-console) || {

@@ -37,6 +37,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::dev_disclaimer
 lib::subheading "Lightspeed Operator"
 
 LIGHTSPEED_DIR=$(lib::resolve_sibling LIGHTSPEED_DIR lightspeed-operator) || {

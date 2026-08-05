@@ -58,6 +58,7 @@ case "${1:-}" in
     "")               ;; # no args is fine
     *)                usage >&2; exit 1 ;;
 esac
+lib::dev_disclaimer
 
 # -- Prerequisites -------------------------------------------------------------
 

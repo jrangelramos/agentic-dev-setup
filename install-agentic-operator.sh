@@ -41,6 +41,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::dev_disclaimer
 lib::subheading "Agentic Operator"
 
 AGENTIC_OPERATOR_DIR=$(lib::resolve_sibling AGENTIC_OPERATOR_DIR lightspeed-agentic-operator) || {

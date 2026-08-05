@@ -38,6 +38,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::dev_disclaimer
 lib::subheading "Skills"
 
 SKILLS_DIR=$(lib::resolve_sibling SKILLS_DIR agentic-skills) || {

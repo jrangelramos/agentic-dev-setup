@@ -30,6 +30,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::dev_disclaimer
 lib::subheading "Uninstall Agentic Stack"
 
 lib::require_cmd oc

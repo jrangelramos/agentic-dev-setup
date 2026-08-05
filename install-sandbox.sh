@@ -30,6 +30,7 @@ Environment variables:
 EOF
 }
 lib::parse_args "$@"
+lib::dev_disclaimer
 lib::subheading "Sandbox"
 
 SANDBOX_DIR=$(lib::resolve_sibling SANDBOX_DIR lightspeed-agentic-sandbox) || {

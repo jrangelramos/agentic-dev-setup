@@ -31,6 +31,11 @@ lib::parse_args() {
     esac
 }
 
+lib::dev_disclaimer() {
+    echo "" >&2
+    echo -e " ${_BOLD}${_YELLOW}⚠  ${_RESET}${_BOLD}DEV-ONLY tooling. DO NOT use on production clusters. ${_YELLOW}⚠${_RESET}" >&2
+}
+
 _LIB_STEP=0
 lib::heading()     { _LIB_STEP=0; echo -e "\n${_BOLD}${_YELLOW}── $* ──${_RESET}" >&2; }
 lib::subheading()  { _LIB_STEP=0; echo -e "\n ${_BOLD}${_MAGENTA}▸ $*${_RESET}" >&2; }
