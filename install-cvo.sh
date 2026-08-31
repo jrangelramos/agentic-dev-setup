@@ -133,6 +133,26 @@ if [[ -z "${SKILLS_IMAGE}" ]]; then
 fi
 lib::log_success "Skills image: ${SKILLS_IMAGE}"
 
+# -- Resolve console plugin image ---------------------------------------------
+
+CONSOLE_PLUGIN_NS="openshift-cluster-update-console-plugin"
+
+lib::step "Resolving cluster-update-console-plugin image..."
+
+CONSOLE_PLUGIN_IMAGE=$(oc get imagestream -n "${CONSOLE_PLUGIN_NS}" cluster-update-console-plugin \
+    -o jsonpath='{.status.tags[?(@.tag=="dev")].items[0].dockerImageReference}' 2>/dev/null || echo "")
+if [[ -z "${CONSOLE_PLUGIN_IMAGE}" ]]; then
+    lib::log_warning "No 'dev' tag found, trying 'latest' tag"
+    CONSOLE_PLUGIN_IMAGE=$(oc get imagestream -n "${CONSOLE_PLUGIN_NS}" cluster-update-console-plugin \
+        -o jsonpath='{.status.tags[?(@.tag=="latest")].items[0].dockerImageReference}' 2>/dev/null || echo "")
+fi
+if [[ -z "${CONSOLE_PLUGIN_IMAGE}" ]]; then
+    lib::log_error "cluster-update-console-plugin imagestream not found in ${CONSOLE_PLUGIN_NS} (tried 'dev' and 'latest' tags)."
+    lib::log_error "Run install-cluster-update-console.sh first to build and push the image."
+    exit 1
+fi
+lib::log_success "Console plugin image: ${CONSOLE_PLUGIN_IMAGE}"
+
 # -- Build CVO binaries --------------------------------------------------------
 
 lib::step "Building CVO binaries (linux/amd64)..."
@@ -163,7 +183,7 @@ COPY bootstrap /bootstrap
 RUN rm -f /manifests/0000_50_* && \\
     mkdir -p /release-manifests && \\
     echo '{"kind":"cincinnati-metadata-v0","version":"${CLUSTER_VERSION}"}' > /release-manifests/release-metadata && \\
-    printf '{"kind":"ImageStream","apiVersion":"image.openshift.io/v1","metadata":{"name":"${CLUSTER_VERSION}","creationTimestamp":null},"spec":{"tags":[{"name":"cluster-version-operator","annotations":{"io.openshift.build.versions":"kubernetes=1.35.0"},"from":{"kind":"DockerImage","name":"cluster-version-operator:latest"},"generation":null,"importPolicy":{},"referencePolicy":{"type":""}},{"name":"agentic-skills","from":{"kind":"DockerImage","name":"${SKILLS_IMAGE}"},"generation":null,"importPolicy":{},"referencePolicy":{"type":""}}]}}' > /release-manifests/image-references
+    printf '{"kind":"ImageStream","apiVersion":"image.openshift.io/v1","metadata":{"name":"${CLUSTER_VERSION}","creationTimestamp":null},"spec":{"tags":[{"name":"cluster-version-operator","annotations":{"io.openshift.build.versions":"kubernetes=1.35.0"},"from":{"kind":"DockerImage","name":"cluster-version-operator:latest"},"generation":null,"importPolicy":{},"referencePolicy":{"type":""}},{"name":"agentic-skills","from":{"kind":"DockerImage","name":"${SKILLS_IMAGE}"},"generation":null,"importPolicy":{},"referencePolicy":{"type":""}},{"name":"cluster-update-console-plugin","from":{"kind":"DockerImage","name":"${CONSOLE_PLUGIN_IMAGE}"},"generation":null,"importPolicy":{},"referencePolicy":{"type":""}}]}}' > /release-manifests/image-references
 ENTRYPOINT ["/usr/bin/cluster-version-operator"]
 DOCKERFILE
 lib::log_success "Generated Dockerfile.dev (version: ${CLUSTER_VERSION})"

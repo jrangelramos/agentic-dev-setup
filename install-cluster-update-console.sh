@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Build and deploy the cluster-update-console-plugin.
+# Build the cluster-update-console-plugin image and push to the OpenShift
+# internal registry.  Deployment is handled by the CVO agenticrun controller
+# (not by this script).  The CVO reads the image reference from its embedded
+# image-references; see install-cvo.sh for how that is wired up.
 #
-# This is a standalone OpenShift console plugin (not managed by the agentic
-# operator), deployed via its Helm chart.
+# The image is pushed to the "openshift-cluster-update-console-plugin"
+# namespace (matching the CVO's bindata assets), NOT to AGENTIC_NAMESPACE.
 #
 # Env:
 #   CLUSTER_UPDATE_DIR   (default: ../cluster-update-console-plugin)
-#   AGENTIC_NAMESPACE    (default: openshift-lightspeed)
 #   SKIP_BUILD           If set, skip image build
 #   CLUSTER_UPDATE_IMAGE Override image (skip build)
 
@@ -16,9 +18,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./_lib.sh
 source "${SCRIPT_DIR}/_lib.sh"
 
+PLUGIN_NAME="cluster-update-console-plugin"
+PLUGIN_NAMESPACE="openshift-cluster-update-console-plugin"
+
 usage() {
     cat <<EOF
-Build and deploy the cluster-update-console-plugin.
+Build the cluster-update-console-plugin image and push to the internal registry.
+Deployment is deferred to the CVO agenticrun controller.
 
 Usage:
   ./install-cluster-update-console.sh
@@ -27,9 +33,8 @@ Usage:
 Environment variables:
   CLUSTER_UPDATE_DIR     Path to source (default: ../cluster-update-console-plugin)
   CLUSTER_UPDATE_IMAGE   Override image (skip build)
-  AGENTIC_NAMESPACE      Namespace (default: openshift-lightspeed)
   SKIP_BUILD             Skip image build
-  BUILD_ONLY             Build image locally only (no push, no deploy, no cluster needed)
+  BUILD_ONLY             Build image locally only (no push, no cluster needed)
 EOF
 }
 lib::parse_args "$@"
@@ -41,74 +46,45 @@ CLUSTER_UPDATE_DIR=$(lib::resolve_sibling CLUSTER_UPDATE_DIR cluster-update-cons
     exit 1
 }
 
-PLUGIN_NAME="cluster-update-console-plugin"
-CHART_DIR="${CLUSTER_UPDATE_DIR}/charts/openshift-console-plugin"
-
-if [[ -z "${BUILD_ONLY:-}" ]]; then
-    if [[ ! -d "${CHART_DIR}" ]]; then
-        lib::log_error "Helm chart not found at ${CHART_DIR}"
-        exit 1
-    fi
-    lib::require_cmd helm
-fi
-
 # -- Build image ---------------------------------------------------------------
 
-if [[ -z "${SKIP_BUILD:-}" && -z "${CLUSTER_UPDATE_IMAGE:-}" ]]; then
-    lib::step "Building cluster-update-console-plugin..."
-    if [[ -n "${BUILD_ONLY:-}" ]]; then
-        CLUSTER_UPDATE_IMAGE=$(lib::build_local "${PLUGIN_NAME}" "${CLUSTER_UPDATE_DIR}" "Dockerfile")
-    else
-        lib::setup_registry
-        CLUSTER_UPDATE_IMAGE=$(lib::build_and_push "${PLUGIN_NAME}" "${CLUSTER_UPDATE_DIR}" "Dockerfile")
-    fi
+if [[ -n "${SKIP_BUILD:-}" && -n "${CLUSTER_UPDATE_IMAGE:-}" ]]; then
+    lib::log_info "SKIP_BUILD set — using provided CLUSTER_UPDATE_IMAGE"
+elif [[ -n "${SKIP_BUILD:-}" ]]; then
+    lib::log_info "SKIP_BUILD set — skipping cluster-update-console-plugin build"
+    exit 0
+elif [[ -n "${CLUSTER_UPDATE_IMAGE:-}" ]]; then
+    lib::log_info "CLUSTER_UPDATE_IMAGE provided — skipping build"
+elif [[ -n "${BUILD_ONLY:-}" ]]; then
+    CLUSTER_UPDATE_IMAGE=$(lib::build_local "${PLUGIN_NAME}" "${CLUSTER_UPDATE_DIR}" "Dockerfile")
 else
-    lib::step "Skipping build"
-    CLUSTER_UPDATE_IMAGE="${CLUSTER_UPDATE_IMAGE:-quay.io/openshift/${PLUGIN_NAME}:latest}"
+    lib::step "Setting up registry..."
+    lib::setup_registry "${PLUGIN_NAMESPACE}"
+
+    lib::step "Building and pushing ${PLUGIN_NAME}..."
+    local_tag="${_REGISTRY}/${PLUGIN_NAMESPACE}/${PLUGIN_NAME}:dev"
+    podman build -t "${local_tag}" -f "${CLUSTER_UPDATE_DIR}/Dockerfile" "${CLUSTER_UPDATE_DIR}" >&2
+    oc create imagestream "${PLUGIN_NAME}" -n "${PLUGIN_NAMESPACE}" >/dev/null 2>&1 || true
+    podman push --tls-verify=false "${local_tag}" >&2
+
+    CLUSTER_UPDATE_IMAGE="image-registry.openshift-image-registry.svc:5000/${PLUGIN_NAMESPACE}/${PLUGIN_NAME}:dev"
+    lib::log_success "${PLUGIN_NAME} → ${CLUSTER_UPDATE_IMAGE}"
+
+    # Grant image-puller so CVO-deployed pods can pull from this namespace.
+    lib::step "Granting image-puller access..."
+    oc policy add-role-to-group system:image-puller \
+        "system:serviceaccounts:${PLUGIN_NAMESPACE}" -n "${PLUGIN_NAMESPACE}" >&2
+    lib::log_success "image-puller granted to ${PLUGIN_NAMESPACE} serviceaccounts"
 fi
 
 lib::log_success "Image: ${CLUSTER_UPDATE_IMAGE}"
 
 if [[ -n "${BUILD_ONLY:-}" ]]; then
-    lib::log_info "BUILD_ONLY set — skipping deploy"
+    lib::log_info "BUILD_ONLY set — skipping deploy (deploy is handled by CVO)"
     exit 0
 fi
 
-# -- Deploy via Helm -----------------------------------------------------------
+lib::log_info "Deployment is handled by the CVO agenticrun controller."
+lib::log_info "Run install-cvo.sh to build a dev CVO that references this image."
 
-lib::step "Deploying via Helm chart..."
-
-# Clean up orphaned resources from a previous partial install.
-# Deployment selectors are immutable so it must be deleted for Helm to recreate it.
-# Other resources are adopted in place via Helm ownership labels.
-if ! helm status "${PLUGIN_NAME}" -n "${AGENTIC_NAMESPACE}" >/dev/null 2>&1; then
-    oc delete deployment "${PLUGIN_NAME}" -n "${AGENTIC_NAMESPACE}" --ignore-not-found 2>/dev/null || true
-    for kind in sa service configmap consoleplugin; do
-        oc label "${kind}" "${PLUGIN_NAME}" -n "${AGENTIC_NAMESPACE}" \
-            app.kubernetes.io/managed-by=Helm --overwrite 2>/dev/null || true
-        oc annotate "${kind}" "${PLUGIN_NAME}" -n "${AGENTIC_NAMESPACE}" \
-            meta.helm.sh/release-name="${PLUGIN_NAME}" \
-            meta.helm.sh/release-namespace="${AGENTIC_NAMESPACE}" \
-            --overwrite 2>/dev/null || true
-    done
-fi
-
-echo helm upgrade --install "${PLUGIN_NAME}" "${CHART_DIR}" \
-    --namespace "${AGENTIC_NAMESPACE}" \
-    --create-namespace \
-    --set plugin.name="${PLUGIN_NAME}" \
-    --set plugin.image="${CLUSTER_UPDATE_IMAGE}" \
-    --set plugin.imagePullPolicy=Always
-
-helm upgrade --install "${PLUGIN_NAME}" "${CHART_DIR}" \
-    --namespace "${AGENTIC_NAMESPACE}" \
-    --create-namespace \
-    --set plugin.name="${PLUGIN_NAME}" \
-    --set plugin.image="${CLUSTER_UPDATE_IMAGE}" \
-    --set plugin.imagePullPolicy=Always
-
-# Force pod rollout so new images are pulled even when the tag hasn't changed.
-oc rollout restart deployment/"${PLUGIN_NAME}" -n "${AGENTIC_NAMESPACE}"
-
-lib::wait_for_deployment "${PLUGIN_NAME}" "${AGENTIC_NAMESPACE}" "120s" || true
-lib::log_success "cluster-update-console-plugin deployed"
+echo "${CLUSTER_UPDATE_IMAGE}"

@@ -168,6 +168,12 @@ if [[ -z "${SKIP_BUILD:-}" ]]; then
         export CONSOLE_IMAGE
         lib::log_success "Console image: ${CONSOLE_IMAGE}"
     fi
+
+    if [[ "$CLUSTER_UPDATE_AVAILABLE" == "true" && -z "${CLUSTER_UPDATE_IMAGE:-}" ]]; then
+        CLUSTER_UPDATE_IMAGE=$(CLUSTER_UPDATE_DIR="${CLUSTER_UPDATE_DIR}" "${SCRIPT_DIR}/install-cluster-update-console.sh")
+        export CLUSTER_UPDATE_IMAGE
+        lib::log_success "Cluster update console image: ${CLUSTER_UPDATE_IMAGE}"
+    fi
 fi
 
 if [[ -n "${BUILD_ONLY:-}" ]]; then
@@ -176,9 +182,10 @@ if [[ -n "${BUILD_ONLY:-}" ]]; then
 ════════════════════════════════════════════════════════════════
   Images built (BUILD_ONLY mode — no deploy)
 
-  Sandbox image  : ${SANDBOX_IMAGE:-not built}
-  Skills image   : ${SKILLS_IMAGE:-not built}
-  Console image  : ${CONSOLE_IMAGE:-not built}
+  Sandbox image              : ${SANDBOX_IMAGE:-not built}
+  Skills image               : ${SKILLS_IMAGE:-not built}
+  Console image              : ${CONSOLE_IMAGE:-not built}
+  Cluster update console     : ${CLUSTER_UPDATE_IMAGE:-not built}
 ════════════════════════════════════════════════════════════════
 
   To deploy, run without BUILD_ONLY:
@@ -208,12 +215,6 @@ AGENTIC_OPERATOR_DIR="${AGENTIC_OPERATOR_DIR}" \
     SANDBOX_IMAGE="${SANDBOX_IMAGE:-}" \
     CONSOLE_IMAGE="${CONSOLE_IMAGE:-}" \
     "${SCRIPT_DIR}/install-agentic-operator.sh"
-
-# -- Deploy cluster-update-console-plugin (standalone, not managed by operator) -
-
-if [[ "$CLUSTER_UPDATE_AVAILABLE" == "true" ]]; then
-    CLUSTER_UPDATE_DIR="${CLUSTER_UPDATE_DIR}" "${SCRIPT_DIR}/install-cluster-update-console.sh"
-fi
 
 # -- Configure LLM -------------------------------------------------------------
 

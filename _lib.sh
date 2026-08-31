@@ -140,6 +140,7 @@ lib::ensure_registry_route() {
 }
 
 lib::setup_registry() {
+    local ns="${1:-${AGENTIC_NAMESPACE}}"
     lib::require_cmd podman
 
     _REGISTRY=$(lib::get_registry_hostname)
@@ -150,19 +151,20 @@ lib::setup_registry() {
 
     lib::log_info "Registry: ${_REGISTRY}"
 
-    lib::ensure_namespace
+    lib::ensure_namespace "${ns}"
     local token
-    token=$(oc create token builder -n "${AGENTIC_NAMESPACE}")
+    token=$(oc create token builder -n "${ns}")
     if ! podman login -u unused --password "${token}" --tls-verify=false "${_REGISTRY}" >&2; then
         lib::log_error "podman login to ${_REGISTRY} failed"
         exit 1
     fi
-    lib::log_success "Logged into registry (builder SA)"
+    lib::log_success "Logged into registry (builder SA in ${ns})"
 }
 
 lib::ensure_namespace() {
-    oc create namespace "${AGENTIC_NAMESPACE}" >/dev/null 2>&1 || true
-    lib::log_success "Namespace ${AGENTIC_NAMESPACE} ready"
+    local ns="${1:-${AGENTIC_NAMESPACE}}"
+    oc create namespace "${ns}" >/dev/null 2>&1 || true
+    lib::log_success "Namespace ${ns} ready"
 }
 
 # ---------------------------------------------------------------------------
