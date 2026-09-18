@@ -57,4 +57,6 @@ else
     lib::setup_registry
     SKILLS_IMAGE=$(lib::build_and_push "agentic-skills" "${SKILLS_DIR}" "Containerfile")
 fi
+lib::log_info "Deployment is handled by the CVO agenticrun controller."
+lib::log_info "Run install-cvo.sh to build a dev CVO that references this image."
 echo "${SKILLS_IMAGE}"
