@@ -94,9 +94,9 @@ any builds). `configure-llm.sh` also validates credentials at deploy time.
 Each script can be run independently:
 
 ```bash
-./install-sandbox.sh                # Build sandbox image only
+./install-agentic-sandbox.sh        # Build sandbox image only
 ./install-skills.sh                 # Build skills image only
-./install-console.sh                # Build console plugin image only
+./install-agentic-console.sh        # Build console plugin image only
 ./install-lightspeed.sh             # Build + deploy lightspeed operator + OLSConfig
 ./install-agentic-operator.sh       # Deploy agentic operator
 ./install-cluster-update-console.sh # Build + deploy cluster-update-console-plugin

@@ -229,6 +229,23 @@ lib::build_and_push() {
 }
 
 # ---------------------------------------------------------------------------
+# Image detection
+# ---------------------------------------------------------------------------
+lib::detect_registry_image() {
+    local name="$1" ns="${2:-${AGENTIC_NAMESPACE}}"
+    local ref=""
+    for tag in dev latest; do
+        ref=$(oc get imagestream -n "${ns}" "${name}" \
+            -o jsonpath="{.status.tags[?(@.tag==\"${tag}\")].items[0].dockerImageReference}" 2>/dev/null || echo "")
+        if [[ -n "${ref}" ]]; then
+            printf '%s' "${ref}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# ---------------------------------------------------------------------------
 # Wait helpers
 # ---------------------------------------------------------------------------
 lib::wait_for_deployment() {

@@ -29,9 +29,9 @@ SKIP_BUILD=1 ./install-all.sh
 BUILD_ONLY=1 ./install-all.sh
 
 # Individual components
-./install-sandbox.sh
+./install-agentic-sandbox.sh
 ./install-skills.sh
-./install-console.sh
+./install-agentic-console.sh
 ./install-lightspeed.sh
 ./install-agentic-operator.sh
 ./install-cluster-update-console.sh
@@ -78,7 +78,7 @@ FORCE=1 ./uninstall.sh
 
 **`install-cvo.sh`** — standalone script (not called by `install-all.sh`). Builds a dev CVO from the `cluster-version-operator` sibling repo with the agenticrun controller enabled. Generates a `Dockerfile.dev` with embedded release metadata and agentic-skills image reference, pushes to the `cvo-dev` project, and patches the live CVO deployment. Supports `--skip-tp-check` to bypass the TechPreviewNoUpgrade gate.
 
-**Image build pattern**: each `install-*.sh` script outputs the in-cluster image URL on stdout so callers can capture it (e.g., `SANDBOX_IMAGE=$(./install-sandbox.sh)`). `BUILD_ONLY` mode uses `lib::build_local` (no push); normal mode uses `lib::build_and_push`.
+**Image build pattern**: each `install-*.sh` script outputs the in-cluster image URL on stdout so callers can capture it (e.g., `SANDBOX_IMAGE=$(./install-agentic-sandbox.sh)`). `BUILD_ONLY` mode uses `lib::build_local` (no push); normal mode uses `lib::build_and_push`.
 
 ## Key Environment Variables
 

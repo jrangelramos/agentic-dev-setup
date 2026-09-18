@@ -19,8 +19,8 @@ usage() {
 Build the agentic sandbox image and push to the OpenShift internal registry.
 
 Usage:
-  ./install-sandbox.sh
-  BUILD_ONLY=1 ./install-sandbox.sh
+  ./install-agentic-sandbox.sh
+  BUILD_ONLY=1 ./install-agentic-sandbox.sh
 
 Environment variables:
   SANDBOX_DIR          Path to source (default: ../lightspeed-agentic-sandbox)
@@ -49,4 +49,6 @@ else
     lib::setup_registry
     SANDBOX_IMAGE=$(lib::build_and_push "lightspeed-agentic-sandbox" "${SANDBOX_DIR}" "Containerfile")
 fi
+lib::log_info "Deployment is handled by the agentic-operator."
+lib::log_info "Run install-agentic-operator.sh to deploy with this image."
 echo "${SANDBOX_IMAGE}"

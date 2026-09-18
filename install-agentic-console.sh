@@ -19,8 +19,8 @@ usage() {
 Build the agentic console plugin image and push to the OpenShift internal registry.
 
 Usage:
-  ./install-console.sh
-  BUILD_ONLY=1 ./install-console.sh
+  ./install-agentic-console.sh
+  BUILD_ONLY=1 ./install-agentic-console.sh
 
 Environment variables:
   CONSOLE_DIR          Path to source (default: ../lightspeed-agentic-console)
@@ -43,10 +43,18 @@ if [[ -n "${SKIP_BUILD:-}" ]]; then
     exit 0
 fi
 
+if ! npm ci --dry-run --prefix "${CONSOLE_DIR}" &>/dev/null; then
+    lib::log_error "package-lock.json is out of sync in ${CONSOLE_DIR}"
+    lib::log_error "Run 'npm install' in ${CONSOLE_DIR} to fix it, then retry."
+    exit 1
+fi
+
 if [[ -n "${BUILD_ONLY:-}" ]]; then
     CONSOLE_IMAGE=$(lib::build_local "lightspeed-agentic-console" "${CONSOLE_DIR}" "Dockerfile")
 else
     lib::setup_registry
     CONSOLE_IMAGE=$(lib::build_and_push "lightspeed-agentic-console" "${CONSOLE_DIR}" "Dockerfile")
 fi
+lib::log_info "Deployment is handled by the agentic-operator."
+lib::log_info "Run install-agentic-operator.sh to deploy with this image."
 echo "${CONSOLE_IMAGE}"

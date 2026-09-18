@@ -81,6 +81,22 @@ if [[ -n "${BUILD_ONLY:-}" ]]; then
     exit 0
 fi
 
+# -- Auto-detect custom images in the internal registry -----------------------
+
+if [[ -z "${CONSOLE_IMAGE:-}" ]]; then
+    CONSOLE_IMAGE=$(lib::detect_registry_image "lightspeed-agentic-console") || true
+    if [[ -n "${CONSOLE_IMAGE}" ]]; then
+        lib::log_info "Detected custom console image in registry — using it"
+    fi
+fi
+
+if [[ -z "${SANDBOX_IMAGE:-}" ]]; then
+    SANDBOX_IMAGE=$(lib::detect_registry_image "lightspeed-agentic-sandbox") || true
+    if [[ -n "${SANDBOX_IMAGE}" ]]; then
+        lib::log_info "Detected custom sandbox image in registry — using it"
+    fi
+fi
+
 # -- Deploy via upstream quickstart --------------------------------------------
 
 lib::step "Deploying via quickstart install.sh..."

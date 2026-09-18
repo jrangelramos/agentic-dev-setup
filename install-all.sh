@@ -152,7 +152,7 @@ if [[ -z "${SKIP_BUILD:-}" ]]; then
     lib::heading "BUILDING IMAGES"
 
     if [[ "$SANDBOX_AVAILABLE" == "true" && -z "${SANDBOX_IMAGE:-}" ]]; then
-        SANDBOX_IMAGE=$(SANDBOX_DIR="${SANDBOX_DIR}" "${SCRIPT_DIR}/install-sandbox.sh")
+        SANDBOX_IMAGE=$(SANDBOX_DIR="${SANDBOX_DIR}" "${SCRIPT_DIR}/install-agentic-sandbox.sh")
         export SANDBOX_IMAGE
         lib::log_success "Sandbox image: ${SANDBOX_IMAGE}"
     fi
@@ -164,7 +164,7 @@ if [[ -z "${SKIP_BUILD:-}" ]]; then
     fi
 
     if [[ "$CONSOLE_AVAILABLE" == "true" && -z "${CONSOLE_IMAGE:-}" ]]; then
-        CONSOLE_IMAGE=$(CONSOLE_DIR="${CONSOLE_DIR}" "${SCRIPT_DIR}/install-console.sh")
+        CONSOLE_IMAGE=$(CONSOLE_DIR="${CONSOLE_DIR}" "${SCRIPT_DIR}/install-agentic-console.sh")
         export CONSOLE_IMAGE
         lib::log_success "Console image: ${CONSOLE_IMAGE}"
     fi
