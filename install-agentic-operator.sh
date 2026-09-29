@@ -68,7 +68,6 @@ if [[ -z "${SKIP_BUILD:-}" ]]; then
         lib::setup_registry
         lib::ensure_namespace
         OPERATOR_IMAGE=$(lib::build_and_push "lightspeed-agentic-operator" "${AGENTIC_OPERATOR_DIR}" "Dockerfile")
-        lib::ensure_pull_secret "${AGENTIC_NAMESPACE}" "lightspeed-agentic-operator"
         IMAGE_PULL_POLICY="Always"
     fi
     lib::log_success "Operator image: ${OPERATOR_IMAGE}"
@@ -108,6 +107,12 @@ QUICKSTART_ARGS=()
 
 NAMESPACE="${AGENTIC_NAMESPACE}" \
     bash "${QUICKSTART}" "${QUICKSTART_ARGS[@]+"${QUICKSTART_ARGS[@]}"}"
+
+# -- Link pull secret (SA now exists after quickstart) -------------------------
+
+if [[ -n "${OPERATOR_IMAGE}" && -z "${SKIP_BUILD:-}" ]]; then
+    lib::ensure_pull_secret "${AGENTIC_NAMESPACE}" "lightspeed-agentic-operator"
+fi
 
 # -- Apply ApprovalPolicy (cluster-scoped singleton) --------------------------
 

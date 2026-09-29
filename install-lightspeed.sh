@@ -58,7 +58,6 @@ if [[ -z "${SKIP_BUILD:-}" ]]; then
         lib::setup_registry
         lib::ensure_namespace
         OPERATOR_IMAGE=$(lib::build_and_push "lightspeed-operator" "${LIGHTSPEED_DIR}" "Dockerfile")
-        lib::ensure_pull_secret "${AGENTIC_NAMESPACE}" "lightspeed-operator-controller-manager"
     fi
     lib::log_success "Operator image: ${OPERATOR_IMAGE}"
 else
@@ -85,6 +84,11 @@ fi
     cd "${LIGHTSPEED_DIR}"
     make deploy IMG="${DEPLOY_IMG}" KUBECTL=oc
 ) >&2
+
+# Link pull secret now that make deploy has created the SA
+if [[ -n "${OPERATOR_IMAGE}" && -z "${SKIP_BUILD:-}" ]]; then
+    lib::ensure_pull_secret "${AGENTIC_NAMESPACE}" "lightspeed-operator-controller-manager"
+fi
 
 lib::step "Waiting for lightspeed-operator..."
 lib::wait_for_deployment "lightspeed-operator-controller-manager"

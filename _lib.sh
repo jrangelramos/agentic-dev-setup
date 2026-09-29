@@ -265,7 +265,7 @@ lib::ensure_pull_secret() {
     local token
     token=$(oc create token builder -n "${ns}")
     oc -n "${ns}" create secret docker-registry internal-registry-pull \
-        --docker-server="${_REGISTRY}" \
+        --docker-server="${_INTERNAL_REGISTRY}" \
         --docker-username="builder" \
         --docker-password="${token}" \
         --dry-run=client -o yaml | oc apply -f - >&2
