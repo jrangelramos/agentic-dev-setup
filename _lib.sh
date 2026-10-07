@@ -152,6 +152,16 @@ lib::setup_registry() {
     lib::log_info "Registry: ${_REGISTRY}"
 
     lib::ensure_namespace "${ns}"
+    lib::log_info "Waiting for builder SA in ${ns}..."
+    local retries=0
+    while ! oc get sa builder -n "${ns}" >/dev/null 2>&1; do
+        retries=$((retries + 1))
+        if (( retries > 30 )); then
+            lib::log_error "Timed out waiting for builder SA in ${ns}"
+            exit 1
+        fi
+        sleep 1
+    done
     local token
     token=$(oc create token builder -n "${ns}")
     if ! podman login -u unused --password "${token}" --tls-verify=false "${_REGISTRY}" >&2; then
