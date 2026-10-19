@@ -244,7 +244,7 @@ echo "  ClusterVersion conditions:" >&2
 oc get clusterversion version \
     -o jsonpath='{range .status.conditions[*]}    {.type}={.status}{"\n"}{end}' 2>/dev/null >&2 || true
 
-cat >&2 <<DONE
+printf '%b' "$(cat <<DONE
 
 ════════════════════════════════════════════════════════════════
   CVO dev deployment complete!
@@ -270,5 +270,15 @@ cat >&2 <<DONE
 
      oc get clusterversion version -o yaml
 
+  ${_YELLOW}5. If agenticrun is not created (no upgrade path available),
+     point to a mock Cincinnati graph API:${_RESET}
+
+     oc patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/upstream", "value": "https://fauxinnati-fauxinnati.apps.ota-stage.q2z4.p1.openshiftapps.com/api/upgrades_info/graph"}]'
+     oc adm upgrade channel smoke-test
+
+     Browse https://fauxinnati-fauxinnati.apps.ota-stage.q2z4.p1.openshiftapps.com/
+     to check the available channels in this mock app.
+
 ────────────────────────────────────────────────────────────────
 DONE
+)" >&2
