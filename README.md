@@ -35,8 +35,8 @@ Use `clone.sh` to set up the directory layout (run from the parent directory).
 ### Using Claude (Anthropic via Vertex AI)
 
 ```bash
-export VERTEX_PROJECT=my-gcp-project
-export VERTEX_REGION=us-east5
+export VERTEX_PROJECT=my-gcp-project  # (i.e. itpc-ca-xyz...)
+export VERTEX_REGION=global
 ./install-minimal.sh
 ```
 
