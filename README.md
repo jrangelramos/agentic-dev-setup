@@ -37,17 +37,12 @@ Use `clone.sh` to set up the directory layout (run from the parent directory).
 export VERTEX_PROJECT=my-gcp-project
 export VERTEX_REGION=us-east5
 
-# Install everything (builds from source)
-./install-all.sh
-
-# Or skip builds (use pre-built Konflux images)
-SKIP_BUILD=1 ./install-all.sh
-
-# Build and push images only (no deploy)
-BUILD_ONLY=1 ./install-all.sh
+# Install: pre-built operator + Claude LLM + build console plugin,
+# skills, and dev CVO from source
+./install-minimal.sh
 
 # Show all available options
-./install-all.sh --help
+./install-minimal.sh --help
 ```
 
 ## GCP Credentials
