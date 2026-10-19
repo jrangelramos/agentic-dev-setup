@@ -32,15 +32,22 @@ Use `clone.sh` to set up the directory layout (run from the parent directory).
 
 ## Quick Start
 
+### Using Claude (Anthropic via Vertex AI)
+
 ```bash
-# Set required env vars
 export VERTEX_PROJECT=my-gcp-project
 export VERTEX_REGION=us-east5
-
-# Install: pre-built operator + Claude LLM + build console plugin,
-# skills, and dev CVO from source
 ./install-minimal.sh
+```
 
+### Using OpenAI
+
+```bash
+export OPENAI_API_KEY=sk-...
+./install-minimal.sh --openai
+```
+
+```bash
 # Show all available options
 ./install-minimal.sh --help
 ```

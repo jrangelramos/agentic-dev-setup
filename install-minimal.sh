@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Minimal install: deploy the agentic operator (pre-built images), configure
-# Claude as the LLM, build the console plugin and skills from source, and
+# the LLM provider, build the console plugin and skills from source, and
 # deploy a dev CVO that wires them together.
 #
 # Prerequisites:
 #   - oc, podman, go, envsubst, jq, gzip on PATH
 #   - Logged into an OpenShift cluster with cluster-admin
-#   - GCP credentials for Vertex AI (Claude via Anthropic)
+#   - LLM credentials (GCP for Claude, or OPENAI_API_KEY for OpenAI)
 #   - Sibling repos: lightspeed-agentic-operator, cluster-update-console-plugin,
 #     agentic-skills, cluster-version-operator
 #
-# Required env:
-#   VERTEX_PROJECT   GCP project ID
-#   VERTEX_REGION    GCP region (e.g. us-east5)
+# Usage:
+#   ./install-minimal.sh                  # Claude via Vertex AI (default)
+#   ./install-minimal.sh --openai         # OpenAI
 
 set -euo pipefail
 
@@ -22,18 +22,24 @@ source "${SCRIPT_DIR}/_lib.sh"
 
 usage() {
     cat <<EOF
-Minimal agentic install: pre-built operator + Claude LLM + build from source
-the console plugin, skills, and dev CVO.
+Minimal agentic install: pre-built operator + LLM configuration + build from
+source the console plugin, skills, and dev CVO.
 
 Usage:
-  export VERTEX_PROJECT=my-project VERTEX_REGION=us-east5
-  ./install-minimal.sh
+  ./install-minimal.sh                  # Claude via Vertex AI (default)
+  ./install-minimal.sh --openai         # OpenAI (direct API key)
+
+Providers:
+  (default)     Claude (Anthropic via Vertex AI) — requires VERTEX_PROJECT, VERTEX_REGION
+  --openai      OpenAI (direct API key) — requires OPENAI_API_KEY
 
 Environment variables:
-  VERTEX_PROJECT         (required) GCP project ID
-  VERTEX_REGION          (required) GCP region (e.g. us-east5)
+  VERTEX_PROJECT         (required for Claude) GCP project ID
+  VERTEX_REGION          (required for Claude) GCP region (e.g. us-east5)
   VERTEX_MODEL           Model name (default: claude-opus-4-6)
   VERTEX_SA_KEY_PATH     Path to GCP credentials JSON (auto-discovered)
+  OPENAI_API_KEY         (required for --openai) OpenAI API key
+  OPENAI_MODEL           Model name (default: gpt-5.4)
   AGENTIC_NAMESPACE      Namespace (default: openshift-lightspeed)
   AGENTIC_OPERATOR_DIR   Path to lightspeed-agentic-operator (default: ../lightspeed-agentic-operator)
   CLUSTER_UPDATE_DIR     Path to cluster-update-console-plugin (default: ../cluster-update-console-plugin)
@@ -41,7 +47,14 @@ Environment variables:
   CVO_DIR                Path to cluster-version-operator (default: ../cluster-version-operator)
 EOF
 }
-lib::parse_args "$@"
+
+LLM_PROVIDER="vertex-anthropic"
+case "${1:-}" in
+    -h|--help)   usage; exit 0 ;;
+    --openai)    LLM_PROVIDER="openai" ;;
+    "")          ;; # default: vertex-anthropic
+    *)           usage >&2; exit 1 ;;
+esac
 lib::dev_disclaimer
 
 # -- Resolve sibling repos (check before anything else) -----------------------
@@ -55,38 +68,41 @@ CVO_DIR=$(lib::resolve_sibling CVO_DIR cluster-version-operator) || CVO_DIR=""
 
 PARENT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-cat >&2 <<BANNER
+if [[ "${LLM_PROVIDER}" == "openai" ]]; then
+    LLM_LABEL="OpenAI (direct API key, model: ${OPENAI_MODEL:-gpt-5.4})"
+else
+    LLM_LABEL="Claude (Anthropic via Vertex AI, model: ${VERTEX_MODEL:-claude-opus-4-6})"
+fi
 
+echo -e "
 ════════════════════════════════════════════════════════════════════
   Minimal Agentic Install
 ════════════════════════════════════════════════════════════════════
 
   This script will run the following steps, in order:
 
-  1. Deploy the Agentic Operator (pre-built Konflux images, no build)
+  ${_BOLD}1. Deploy the Agentic Operator (pre-built Konflux images, no build)${_RESET}
      Installs the lightspeed-agentic-operator which manages agentic
      runs, proposals, and sandbox lifecycle.
 
-  2. Configure LLM — Claude (Anthropic via Vertex AI)
-     Creates the LLM credentials secret, LLMProvider CR, and Agent CR
-     using your GCP/Vertex AI credentials for Claude.
+  ${_BOLD}2. Configure LLM — ${LLM_LABEL}${_RESET}
+     Creates the LLM credentials secret, LLMProvider CR, and Agent CR.
 
-  3. Build and push cluster-update-console-plugin (from source)
+  ${_BOLD}3. Build and push cluster-update-console-plugin (from source)${_RESET}
      Builds the OCP console plugin that provides the cluster update UI.
 
-  4. Build and push agentic-skills (from source)
+  ${_BOLD}4. Build and push agentic-skills (from source)${_RESET}
      Builds the skills OCI image used by sandbox pods for cluster
      update operations.
 
-  5. Build and deploy dev CVO (from source)
+  ${_BOLD}5. Build and deploy dev CVO (from source)${_RESET}
      Builds a development Cluster Version Operator with the agenticrun
      controller enabled, wired to use the custom console plugin and
      skills images built in steps 3-4.
 
 ────────────────────────────────────────────────────────────────────
   Source repos (expected in ${PARENT_DIR}/):
-────────────────────────────────────────────────────────────────────
-BANNER
+────────────────────────────────────────────────────────────────────" >&2
 
 MISSING=()
 _check_repo() {
@@ -133,8 +149,13 @@ for cmd in oc podman envsubst go jq gzip; do
     lib::require_cmd "${cmd}"
 done
 lib::require_oc_login
-lib::require_var VERTEX_PROJECT
-lib::require_var VERTEX_REGION
+
+if [[ "${LLM_PROVIDER}" == "openai" ]]; then
+    lib::require_var OPENAI_API_KEY
+else
+    lib::require_var VERTEX_PROJECT
+    lib::require_var VERTEX_REGION
+fi
 
 lib::step "Checking internal registry access..."
 _REGISTRY=$(lib::get_registry_hostname)
@@ -182,10 +203,10 @@ SKIP_BUILD=1 \
     AGENTIC_OPERATOR_DIR="${AGENTIC_OPERATOR_DIR}" \
     "${SCRIPT_DIR}/install-agentic-operator.sh"
 
-# -- Step 2: Configure LLM (Claude via Vertex AI) ----------------------------
+# -- Step 2: Configure LLM ----------------------------------------------------
 
-lib::heading "STEP 2/5 — CONFIGURE LLM (Claude via Vertex AI)"
-"${SCRIPT_DIR}/configure-llm.sh" --vertex-anthropic
+lib::heading "STEP 2/5 — CONFIGURE LLM (${LLM_LABEL})"
+"${SCRIPT_DIR}/configure-llm.sh" "--${LLM_PROVIDER}"
 
 # -- Step 3: Cluster Update Console Plugin (build from source) ----------------
 
@@ -212,7 +233,7 @@ cat >&2 <<DONE
   Minimal agentic install complete!
 
   Agentic operator  : deployed (pre-built Konflux images)
-  LLM provider      : Claude (Vertex AI / Anthropic)
+  LLM provider      : ${LLM_LABEL}
   Console plugin    : ${CLUSTER_UPDATE_IMAGE}
   Skills image      : ${SKILLS_IMAGE}
   Dev CVO           : deployed with agenticrun controller
