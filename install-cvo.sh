@@ -279,6 +279,10 @@ printf '%b' "$(cat <<DONE
      Browse https://fauxinnati-fauxinnati.apps.ota-stage.q2z4.p1.openshiftapps.com/
      to check the available channels in this mock app.
 
+  ${_YELLOW}   Or point to the release CI Cincinnati graph (live):${_RESET}
+
+     oc patch clusterversion/version --patch '{"spec":{"upstream":"https://multi.ocp.releases.ci.openshift.org/graph"}}' --type=merge
+
 ────────────────────────────────────────────────────────────────
 DONE
 )" >&2
