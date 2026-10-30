@@ -281,7 +281,7 @@ printf '%b' "$(cat <<DONE
 
   ${_YELLOW}   Or point to the release CI Cincinnati graph (live):${_RESET}
 
-     oc patch clusterversion/version --patch '{"spec":{"upstream":"https://multi.ocp.releases.ci.openshift.org/graph"}}' --type=merge
+     oc patch clusterversion/version --patch '{"spec":{"upstream":"https://amd64.ocp.releases.ci.openshift.org/graph"}}' --type=merge
 
 ────────────────────────────────────────────────────────────────
 DONE
