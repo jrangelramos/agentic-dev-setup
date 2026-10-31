@@ -1,19 +1,12 @@
 #!/usr/bin/env bash
 # Build and deploy a dev CVO with the agenticrun controller to a test cluster.
 #
-# Builds the CVO from the cluster-version-operator sibling repo, generates a
-# dev image with embedded release metadata and agentic-skills reference, pushes
-# it to the cluster's internal registry, and patches the live CVO deployment.
-#
-# Note on release payload:
-#   The standard dev workflow uses `oc adm release new` to build a full release
-#   payload image.  This script skips that because `oc adm release new` produces
-#   OCI-format images that the internal registry + CRI-O combination rejects.
-#   Instead, the dev image is built with minimal release-metadata and
-#   image-references baked in and used as both the container image and the
-#   --release-image arg.  CVO reconciles from itself, skipping manifests whose
-#   images aren't in the references.
-#
+# Builds the CVO from the cluster-version-operator sibling repo, extracts the
+# full release payload from the running cluster (image-references + verification
+# configmap), merges in custom agentic-skills / cluster-update-console-plugin
+# images, and bakes everything into the dev CVO image.  The result is a dev CVO
+# whose release is "real" — all ~130 operator images present, verification keys
+# included — so cluster updates work without --force.
 #
 # WARNING: NEVER RUN THIS AGAINST A PRODUCTION CLUSTER.
 
@@ -29,7 +22,7 @@ CVO_DEPLOYMENT="cluster-version-operator"
 
 usage() {
     cat <<EOF
-Build and deploy a dev CVO with the agenticrun controller.
+Build a dev CVO with full release manifest (agenticrun controller + all images).
 
 Usage:
   ./install-cvo.sh [--skip-tp-check]
@@ -51,21 +44,21 @@ SKIP_TP_CHECK=false
 case "${1:-}" in
     -h|--help)        usage; exit 0 ;;
     --skip-tp-check)  SKIP_TP_CHECK=true ;;
-    "")               ;; # no args is fine
+    "")               ;;
     *)                usage >&2; exit 1 ;;
 esac
 lib::dev_disclaimer
 
 # -- Prerequisites -------------------------------------------------------------
 
-lib::subheading "Dev CVO (agenticrun controller)"
+lib::subheading "Dev CVO (full release manifest)"
 lib::step "Checking prerequisites..."
 for cmd in oc go podman jq gzip; do
     lib::require_cmd "${cmd}"
 done
 lib::require_oc_login
 
-# -- Resolve CVO repo ----------------------------------------------------------
+# -- Resolve CVO repo ---------------------------------------------------------
 
 CVO_DIR=$(lib::resolve_sibling CVO_DIR cluster-version-operator) || {
     lib::log_error "cluster-version-operator not found. Clone it next to this repo or set CVO_DIR."
@@ -74,13 +67,18 @@ CVO_DIR=$(lib::resolve_sibling CVO_DIR cluster-version-operator) || {
 lib::log_success "CVO repo: ${CVO_DIR}"
 
 DOCKERFILE_DEV="${CVO_DIR}/Dockerfile.dev"
+IMAGE_REFS_DEV="${CVO_DIR}/.dev-image-references"
+RELEASE_META_DEV="${CVO_DIR}/.dev-release-metadata"
+VERIFY_CM_DEV="${CVO_DIR}/.dev-verification-configmap.yaml"
+RELEASE_EXTRACT_DIR=""
 
 cleanup() {
-    rm -f "${DOCKERFILE_DEV}"
+    rm -f "${DOCKERFILE_DEV}" "${IMAGE_REFS_DEV}" "${RELEASE_META_DEV}" "${VERIFY_CM_DEV}"
+    [[ -n "${RELEASE_EXTRACT_DIR}" ]] && rm -rf "${RELEASE_EXTRACT_DIR}"
 }
 trap cleanup EXIT
 
-# -- Check cluster version -----------------------------------------------------
+# -- Cluster version -----------------------------------------------------------
 
 lib::step "Checking cluster version..."
 
@@ -89,12 +87,29 @@ if [[ -z "${CLUSTER_VERSION}" ]]; then
     lib::log_error "Could not determine cluster version"
     exit 1
 fi
+
+# Find the original release image. If desired.image already points to the
+# internal registry (from a previous install), fall back to history.
+CURRENT_RELEASE=$(oc get clusterversion version -o jsonpath='{.status.desired.image}')
+if [[ "${CURRENT_RELEASE}" == *"image-registry.openshift-image-registry.svc"* ]]; then
+    lib::log_warning "desired.image points to internal registry (previous install)"
+    lib::log_info "Searching history for original release image..."
+    CURRENT_RELEASE=$(oc get clusterversion version -o json | \
+        jq -r '[.status.history[].image | select(test("image-registry.openshift-image-registry") | not)] | first // empty')
+    if [[ -z "${CURRENT_RELEASE}" ]]; then
+        lib::log_error "Could not find original release image in history"
+        lib::log_error "Set ORIGINAL_RELEASE=<image> and re-run"
+        exit 1
+    fi
+fi
+CURRENT_RELEASE="${ORIGINAL_RELEASE:-${CURRENT_RELEASE}}"
+
 lib::log_success "Cluster version: ${CLUSTER_VERSION}"
+lib::log_success "Release image: ${CURRENT_RELEASE}"
 
 # -- Ensure cvo-dev project ----------------------------------------------------
 
 lib::step "Ensuring '${CVO_DEV_PROJECT}' project exists..."
-
 if oc get project "${CVO_DEV_PROJECT}" &>/dev/null; then
     lib::log_success "Project '${CVO_DEV_PROJECT}' already exists"
 else
@@ -116,42 +131,92 @@ fi
 podman login --tls-verify=false -u kubeadmin -p "$(oc whoami -t)" "${_REGISTRY}" >&2
 lib::log_success "Logged into registry: ${_REGISTRY}"
 
-# -- Resolve skills image ------------------------------------------------------
+# -- Resolve custom images ----------------------------------------------------
 
 lib::step "Resolving agentic-skills image..."
 
-SKILLS_IMAGE=$(oc get imagestream -n "${AGENTIC_NAMESPACE}" agentic-skills \
-    -o jsonpath='{.status.tags[?(@.tag=="latest")].items[0].dockerImageReference}' 2>/dev/null || echo "")
-if [[ -z "${SKILLS_IMAGE}" ]]; then
-    lib::log_warning "No 'latest' tag found, trying 'dev' tag"
-    SKILLS_IMAGE=$(oc get imagestream -n "${AGENTIC_NAMESPACE}" agentic-skills \
-        -o jsonpath='{.status.tags[?(@.tag=="dev")].items[0].dockerImageReference}' 2>/dev/null || echo "")
-fi
-if [[ -z "${SKILLS_IMAGE}" ]]; then
-    lib::log_error "agentic-skills imagestream not found in ${AGENTIC_NAMESPACE} (tried 'latest' and 'dev' tags). Push the image first."
+SKILLS_IMAGE=$(lib::detect_registry_image agentic-skills "${AGENTIC_NAMESPACE}") || {
+    lib::log_error "agentic-skills imagestream not found. Push the image first."
     exit 1
-fi
+}
 lib::log_success "Skills image: ${SKILLS_IMAGE}"
-
-# -- Resolve console plugin image ---------------------------------------------
 
 CONSOLE_PLUGIN_NS="openshift-cluster-update-console-plugin"
 
 lib::step "Resolving cluster-update-console-plugin image..."
 
-CONSOLE_PLUGIN_IMAGE=$(oc get imagestream -n "${CONSOLE_PLUGIN_NS}" cluster-update-console-plugin \
-    -o jsonpath='{.status.tags[?(@.tag=="dev")].items[0].dockerImageReference}' 2>/dev/null || echo "")
-if [[ -z "${CONSOLE_PLUGIN_IMAGE}" ]]; then
-    lib::log_warning "No 'dev' tag found, trying 'latest' tag"
-    CONSOLE_PLUGIN_IMAGE=$(oc get imagestream -n "${CONSOLE_PLUGIN_NS}" cluster-update-console-plugin \
-        -o jsonpath='{.status.tags[?(@.tag=="latest")].items[0].dockerImageReference}' 2>/dev/null || echo "")
-fi
-if [[ -z "${CONSOLE_PLUGIN_IMAGE}" ]]; then
-    lib::log_error "cluster-update-console-plugin imagestream not found in ${CONSOLE_PLUGIN_NS} (tried 'dev' and 'latest' tags)."
-    lib::log_error "Run install-cluster-update-console.sh first to build and push the image."
+CONSOLE_PLUGIN_IMAGE=$(lib::detect_registry_image cluster-update-console-plugin "${CONSOLE_PLUGIN_NS}") || {
+    lib::log_error "cluster-update-console-plugin imagestream not found. Run install-cluster-update-console.sh first."
     exit 1
-fi
+}
 lib::log_success "Console plugin image: ${CONSOLE_PLUGIN_IMAGE}"
+
+# -- Extract release payload ---------------------------------------------------
+
+lib::step "Extracting release payload (image-references + verification config)..."
+
+PULL_SECRET=$(mktemp)
+oc get secret pull-secret -n openshift-config \
+    -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${PULL_SECRET}"
+
+RELEASE_EXTRACT_DIR=$(mktemp -d)
+oc adm release extract -a "${PULL_SECRET}" --to="${RELEASE_EXTRACT_DIR}" "${CURRENT_RELEASE}" >&2
+rm -f "${PULL_SECRET}"
+
+# Image-references
+cp "${RELEASE_EXTRACT_DIR}/image-references" "${IMAGE_REFS_DEV}"
+TAG_COUNT=$(jq '.spec.tags | length' "${IMAGE_REFS_DEV}")
+lib::log_success "Extracted ${TAG_COUNT} image tags from release"
+
+# Verification configmap (contains GPG keys + signature store URLs)
+HAS_VERIFICATION=false
+VERIFY_CM=$(grep -rl "release.openshift.io/verification-config-map" "${RELEASE_EXTRACT_DIR}/" 2>/dev/null | head -1 || echo "")
+if [[ -n "${VERIFY_CM}" ]]; then
+    cp "${VERIFY_CM}" "${VERIFY_CM_DEV}"
+    HAS_VERIFICATION=true
+    lib::log_success "Found verification configmap: $(basename "${VERIFY_CM}")"
+else
+    lib::log_warning "No verification configmap in release — updates will require --force"
+fi
+
+rm -rf "${RELEASE_EXTRACT_DIR}"
+RELEASE_EXTRACT_DIR=""
+
+# -- Merge custom images into image-references ---------------------------------
+
+lib::step "Merging custom images into image-references..."
+
+# Upsert helper: replace tag if exists, add if not.
+_upsert_tag() {
+    local file="$1" tag_name="$2" image="$3"
+    jq --arg name "${tag_name}" --arg img "${image}" '
+        if (.spec.tags | map(.name) | index($name)) then
+            .spec.tags |= map(
+                if .name == $name then .from.name = $img else . end
+            )
+        else
+            .spec.tags += [{
+                "name": $name,
+                "from": {"kind": "DockerImage", "name": $img},
+                "generation": null,
+                "importPolicy": {},
+                "referencePolicy": {"type": ""}
+            }]
+        end
+    ' "${file}" > "${file}.tmp" && mv "${file}.tmp" "${file}"
+}
+
+_upsert_tag "${IMAGE_REFS_DEV}" "agentic-skills" "${SKILLS_IMAGE}"
+_upsert_tag "${IMAGE_REFS_DEV}" "cluster-update-console-plugin" "${CONSOLE_PLUGIN_IMAGE}"
+
+TAG_COUNT=$(jq '.spec.tags | length' "${IMAGE_REFS_DEV}")
+lib::log_success "Image-references ready (${TAG_COUNT} tags, custom images merged)"
+
+# -- Generate release-metadata -------------------------------------------------
+
+cat > "${RELEASE_META_DEV}" <<EOF
+{"kind":"cincinnati-metadata-v0","version":"${CLUSTER_VERSION}"}
+EOF
 
 # -- Build CVO binaries --------------------------------------------------------
 
@@ -165,13 +230,17 @@ lib::step "Building CVO binaries (linux/amd64)..."
     CGO_ENABLED=0 hack/build-go.sh
 )
 
-# Retrieve VERSION_OVERRIDE from the CVO repo's build-info (needed for image tags).
 VERSION_OVERRIDE=$(cd "${CVO_DIR}" && source hack/build-info.sh >&2 && echo "${VERSION_OVERRIDE}")
 lib::log_success "Built CVO binaries: ${VERSION_OVERRIDE}"
 
 # -- Generate Dockerfile.dev ---------------------------------------------------
 
 lib::step "Generating Dockerfile.dev..."
+
+VERIFY_COPY=""
+if [[ "${HAS_VERIFICATION}" == "true" ]]; then
+    VERIFY_COPY="COPY .dev-verification-configmap.yaml /manifests/0000_00_cluster-version-operator_verification.yaml"
+fi
 
 cat > "${DOCKERFILE_DEV}" <<DOCKERFILE
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -180,13 +249,13 @@ COPY install /manifests
 COPY vendor/github.com/openshift/api/config/v1/zz_generated.crd-manifests/0000_00_cluster-version-operator_* /manifests/
 COPY vendor/github.com/openshift/api/operator/v1alpha1/zz_generated.crd-manifests/0000_00_cluster-version-operator_* /manifests/
 COPY bootstrap /bootstrap
-RUN rm -f /manifests/0000_50_* && \\
-    mkdir -p /release-manifests && \\
-    echo '{"kind":"cincinnati-metadata-v0","version":"${CLUSTER_VERSION}"}' > /release-manifests/release-metadata && \\
-    printf '{"kind":"ImageStream","apiVersion":"image.openshift.io/v1","metadata":{"name":"${CLUSTER_VERSION}","creationTimestamp":null},"spec":{"tags":[{"name":"cluster-version-operator","annotations":{"io.openshift.build.versions":"kubernetes=1.35.0"},"from":{"kind":"DockerImage","name":"cluster-version-operator:latest"},"generation":null,"importPolicy":{},"referencePolicy":{"type":""}},{"name":"agentic-skills","from":{"kind":"DockerImage","name":"${SKILLS_IMAGE}"},"generation":null,"importPolicy":{},"referencePolicy":{"type":""}},{"name":"cluster-update-console-plugin","from":{"kind":"DockerImage","name":"${CONSOLE_PLUGIN_IMAGE}"},"generation":null,"importPolicy":{},"referencePolicy":{"type":""}}]}}' > /release-manifests/image-references
+RUN rm -f /manifests/0000_50_* && mkdir -p /release-manifests
+COPY .dev-release-metadata /release-manifests/release-metadata
+COPY .dev-image-references /release-manifests/image-references
+${VERIFY_COPY}
 ENTRYPOINT ["/usr/bin/cluster-version-operator"]
 DOCKERFILE
-lib::log_success "Generated Dockerfile.dev (version: ${CLUSTER_VERSION})"
+lib::log_success "Generated Dockerfile.dev (version: ${CLUSTER_VERSION}, ${TAG_COUNT} image tags, verification: ${HAS_VERIFICATION})"
 
 # -- Build container image -----------------------------------------------------
 
@@ -215,9 +284,17 @@ if [[ -z "${PULLSPEC}" ]]; then
 fi
 lib::log_info "Pullspec: ${PULLSPEC}"
 
+RELEASE_ARG_IDX=$(oc get deployment -n "${CVO_NS}" "${CVO_DEPLOYMENT}" \
+    -o jsonpath='{.spec.template.spec.containers[0].args}' | \
+    jq -r 'to_entries[] | select(.value | startswith("--release-image=")) | .key')
+if [[ -z "${RELEASE_ARG_IDX}" ]]; then
+    lib::log_error "Could not find --release-image arg in CVO deployment"
+    exit 1
+fi
+
 oc patch -n "${CVO_NS}" deployment "${CVO_DEPLOYMENT}" --type json --patch="[
   {\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/image\",\"value\":\"${PULLSPEC}\"},
-  {\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args/1\",\"value\":\"--release-image=${PULLSPEC}\"},
+  {\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args/${RELEASE_ARG_IDX}\",\"value\":\"--release-image=${PULLSPEC}\"},
   {\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/imagePullPolicy\",\"value\":\"Always\"}
 ]" 2>&1 | grep -v "^Warning:" >&2
 lib::log_success "Patched image, --release-image, and imagePullPolicy"
@@ -247,9 +324,19 @@ oc get clusterversion version \
 printf '%b' "$(cat <<DONE
 
 ════════════════════════════════════════════════════════════════
-  CVO dev deployment complete!
+  CVO dev deployment complete! (full release manifest)
   Version: ${VERSION_OVERRIDE} → ${CLUSTER_VERSION}
+  Image tags: ${TAG_COUNT} (full release + custom images merged)
+  Verification configmap: ${HAS_VERIFICATION}
 ════════════════════════════════════════════════════════════════
+
+── Summary ─────────────────────────────────────────────────────
+
+  Built CVO from source, extracted the cluster's real release
+  payload (~${TAG_COUNT} images + GPG verification keys), merged
+  in custom agentic-skills and console-plugin images, and baked
+  it all into a single dev image used as both container and
+  --release-image.
 
 ── Next steps ──────────────────────────────────────────────────
 
